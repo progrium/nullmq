@@ -1,0 +1,164 @@
+requirements:
+jasmine-node
+growl
+coffee-script
+
+NullMQ: ZeroMQ-like sockets using STOMP over WebSocket
+
+automatic reconnects
+dynamic message batching
+queue (optionally durable)
+
+Reflector pub/sub example
+=================
+// Browser A, Publisher
+context = nullmq.Context('http://endpoint')
+socklet = context.socklet(nullmq.PUB)
+socklet.connect('/foo/bar')
+socklet.send("GET THIS")
+
+// Browser B, Subscriber
+context = nullmq.Context('http://endpoint')
+socklet = context.socklet(nullmq.SUB)
+socklet.connect('/foo/bar')
+socklet.setsockopt(nullmq.SUBSCRIBE, '')
+socklet.recvall(function (msg) {
+    // got it!
+})
+
+Reflector req/rep example
+=========================
+// Browser A, Requester (client)
+context = nullmq.Context('http://endpoint')
+socklet = context.socklet(nullmq.REQ)
+socklet.connect('/service')
+socklet.send("give me a thing")
+socklet.recv(function (reply) {
+    // yay!
+});
+
+// Browser A, Replyer (server)
+context = nullmq.Context('http://endpoint')
+socklet = context.socklet(nullmq.REP)
+socklet.bind('/service') // Bind semantics here mean "don't let others bind as REP"
+socklet.recvall(function (req) {
+    socklet.send("here's your thing");
+});
+
+
+
+context = nullmq.Context('http://endpoint')
+socklet = context.socklet(nullmq.SUB)
+socklet.connect('/presence/updates')
+socklet.recv(function (msg) {
+    
+})
+socklet.recvall(function (msg) {
+
+})
+socklet.send()
+socklet.sendmulti()
+
+socklet = conn.socklet(nullmq.REQ)
+socklet.connect('/presence/snapshot')
+
+socklet = conn.socklet(nullmq.PUSH)
+socklet.connect('/presence/update')
+
+
+ STOMP
+  - send
+  - subscribe
+  - unsubscribe
+  
+  
+REQ
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    send (client to server)
+        SEND
+        destination:/named-connection
+        request-id: 1
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+        request-id: 1
+REP
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+        request-id: 1
+    send (client to server)
+        SEND
+        destination:/named-connection
+        request-id: 1
+PUSH
+    send (client to server)
+        SEND
+        destination:/named-connection
+PULL
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+PUB
+    send (client to server)
+        SEND
+        destination:/named-connection
+SUB
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+PAIR
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+    send (client to server)
+        SEND
+        destination:/named-connection
+DEALER (PUSH/PULL)
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+    send (client to server)
+        SEND
+        destination:/named-connection
+ROUTER
+    connect
+        SUBSCRIBE
+        destination:/named-connection
+        identity:(socket identity if set)
+    recv (server to client)
+        MESSAGE
+        destination:/named-connection
+        message-id: 123
+    send (client to server)
+        SEND
+        destination:/named-connection
