@@ -3,25 +3,23 @@ fs     = require 'fs'
 util   = require 'util'
 
 task 'watch', 'Watch for changes in coffee files to build and test', ->
-  invoke 'watch:coffee'
-  invoke 'watch:tests'
-
-task 'watch:coffee', 'Watch coffee files for changes to build', ->
-    util.log "Building on changes in src and test"
+    util.log "Watching for changes in src and test"
     watchDir 'src', ->
       invoke 'build:src'
+      invoke 'build:test'
     watchDir 'test', ->
       invoke 'build:test'
-    
-task 'watch:tests', 'Watch test files for changes to test', ->
-    util.log "Testing on changes in lib/test"
     watchDir 'lib/test', ->
       invoke 'test'
 
 task 'test', 'Run the tests', ->
   util.log "Running tests..."
   exec "jasmine-node --nocolor lib/test", (err, stdout, stderr) -> 
-    if err then handleError(parseTestResults(stdout)) else util.log lastLine(stdout)
+    if err
+      handleError(parseTestResults(stdout), stderr)
+    else
+      displayNotification "Tests pass!"
+      util.log lastLine(stdout)
 
 task 'build', 'Build source and tests', ->
   invoke 'build:src'
@@ -54,9 +52,13 @@ parseTestResults = (data) ->
 lastLine = (data) ->
   (line for line in data.split('\n') when line.length > 5).pop()
 
-handleError = (error) -> 
-  util.log error
-  displayNotification error
+handleError = (error, stderr) -> 
+  if stderr? and !error
+    util.log stderr
+    displayNotification stderr.match(/\n(Error:[^\n]+)/)?[1]
+  else
+    util.log error
+    displayNotification error
         
 displayNotification = (message = '') -> 
   options = { title: 'CoffeeScript' }
