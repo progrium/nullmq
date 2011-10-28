@@ -4,17 +4,23 @@ util   = require 'util'
 
 task 'watch', 'Watch for changes in coffee files to build and test', ->
     util.log "Watching for changes in src and test"
+    lastTest = 0
     watchDir 'src', ->
       invoke 'build:src'
       invoke 'build:test'
     watchDir 'test', ->
       invoke 'build:test'
-    watchDir 'lib/test', ->
-      invoke 'test'
+    watchDir 'dist/test', (file)->
+      # We only want to run tests once (a second), 
+      # even if a bunch of test files change
+      time = new Date().getTime()
+      if (time-lastTest) > 1000
+        lastTest = time
+        invoke 'test'
 
 task 'test', 'Run the tests', ->
   util.log "Running tests..."
-  exec "jasmine-node --nocolor lib/test", (err, stdout, stderr) -> 
+  exec "jasmine-node --nocolor dist/test", (err, stdout, stderr) -> 
     if err
       handleError(parseTestResults(stdout), stderr)
     else
@@ -27,12 +33,12 @@ task 'build', 'Build source and tests', ->
 
 task 'build:src', 'Build the src files into lib', ->
   util.log "Compiling src..."
-  exec "coffee -o lib/ -c src/", (err, stdout, stderr) -> 
+  exec "coffee -o dist/ -c src/", (err, stdout, stderr) -> 
     handleError(err) if err
 
 task 'build:test', 'Build the test files into lib/test', ->
   util.log "Compiling test..."
-  exec "coffee -o lib/test/ -c test/", (err, stdout, stderr) -> 
+  exec "coffee -o dist/test/ -c test/", (err, stdout, stderr) -> 
     handleError(err) if err
 
 watchDir = (dir, callback) ->
