@@ -3,6 +3,13 @@ jasmine-node
 growl
 coffee-script
 
+v1 out of scope
+ - performance
+ - multipart
+ - durable queues
+ - reconnects
+ - linger
+
 NullMQ: ZeroMQ-like sockets using STOMP over WebSocket
 
 automatic reconnects
@@ -64,12 +71,6 @@ socklet.connect('/presence/snapshot')
 
 socklet = conn.socklet(nullmq.PUSH)
 socklet.connect('/presence/update')
-
-
- STOMP
-  - send
-  - subscribe
-  - unsubscribe
   
   
 REQ
