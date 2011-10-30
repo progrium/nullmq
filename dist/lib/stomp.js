@@ -1,7 +1,8 @@
 (function() {
-  var Client, Stomp, WebSocketStompMock;
+  var Client, Stomp;
   var __hasProp = Object.prototype.hasOwnProperty, __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   Stomp = {
+    WebSocket: typeof WebSocket !== "undefined" && WebSocket !== null ? WebSocket : null,
     frame: function(command, headers, body) {
       if (headers == null) {
         headers = [];
@@ -81,12 +82,10 @@
       return this.ws.send(out);
     };
     Client.prototype.connect = function(login_, passcode_, connectCallback, errorCallback) {
-      var klass;
       if (typeof this.debug === "function") {
         this.debug("Opening Web Socket...");
       }
-      klass = WebSocketStompMock || WebSocket;
-      this.ws = new klass(this.url);
+      this.ws = new Stomp.WebSocket(this.url);
       this.ws.onmessage = __bind(function(evt) {
         var frame, onreceive;
         if (typeof this.debug === "function") {
@@ -190,6 +189,5 @@
     window.Stomp = Stomp;
   } else {
     exports.Stomp = Stomp;
-    WebSocketStompMock = require('./test/server.mock.js').StompServerMock;
   }
 }).call(this);
