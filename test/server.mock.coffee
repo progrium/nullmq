@@ -21,16 +21,42 @@ class exports.ReflectorServerMock extends WebSocketMock
   stomp_init: ->
     @transactions = {}
     @subscriptions = {}
-    @messages = []
+    @mailbox = []
+    @rr_index = 0
     @router = setInterval =>
       if @readyState isnt 1 then clearInterval @router
-      if @messages.length > 0
-        for frame in @messages
-          for id, sub of @subscriptions
-            if frame? and frame.destination is sub[0]
-              sub[1](Math.random(), frame.body)
-      @messages = []
-    , 100
+      is_corresponding = (subscription, frame) ->
+        # Returns true if destination and socket pairings match
+        socket_routing =
+          pub: 'sub'
+          req: 'rep'
+          rep: 'req'
+          push: 'pull'
+        subscription.destination is frame.destination and \
+          subscription.socket is socket_routing[frame.headers.socket]
+      while frame = @mailbox.shift()
+        # Core routing logic of the reflector
+        switch frame.headers['socket']
+          when 'pub'
+            # Fanout
+            for id, sub of @subscriptions when is_corresponding sub, frame
+              sub.callback(Math.random(), frame.body)
+          when 'req'
+            # Round robin w/ reply-to
+            reps = (sub for id, sub of @subscriptions when is_corresponding sub, frame)
+            reply_to = frame.headers['reply-to']
+            @rr_index = ++@rr_index % reps.length
+            reps[@rr_index].callback(Math.random(), frame.body, {'reply-to': reply_to})
+          when 'rep'
+            # Reply-to lookup
+            reply_to = frame.headers['reply-to']
+            @subscriptions[reply_to].callback(Math.random(), frame.body)
+          when 'push'
+            # Round robin
+            pulls = (sub for id, sub of @subscriptions when is_corresponding sub, frame)
+            @rr_index = ++@rr_index % pulls.length
+            pulls[@rr_index].callback(Math.random(), frame.body)
+    , 20
   
   stomp_send: (command, headers, body=null) ->
     @_respond(Stomp.marshal(command, headers, body))
@@ -41,11 +67,11 @@ class exports.ReflectorServerMock extends WebSocketMock
     else
       @stomp_send("RECEIPT", {'receipt-id': frame.receipt})
     
-  stomp_send_message: (destination, subscription, message_id, body) ->
-    @stomp_send("MESSAGE", {
-      'destination': destination, 
-      'message-id': message_id,
-      'subscription': subscription}, body)
+  stomp_send_message: (destination, subscription, message_id, body, headers={}) ->
+    headers['destination'] = destination
+    headers['message-id'] = message_id
+    headers['subscription'] = subscription
+    @stomp_send("MESSAGE", headers, body)
 
   stomp_dispatch: (frame) ->
     handler = "stomp_handle_#{frame.command.toLowerCase()}"
@@ -66,7 +92,7 @@ class exports.ReflectorServerMock extends WebSocketMock
   stomp_handle_commit: (frame) ->
     transaction = @transactions[frame.transaction]
     for frame in transaction
-      @messages.push(frame)
+      @mailbox.push(frame)
     delete @transactions[frame.transaction]
 
   stomp_handle_abort: (frame) ->
@@ -74,14 +100,19 @@ class exports.ReflectorServerMock extends WebSocketMock
 
   stomp_handle_send: (frame) ->
     if frame.transaction
-      @transactions[frame.transaction].push(frame)
+      @transactions[frame.transaction].push frame
     else
-      @messages.push(frame)
+      @mailbox.push frame
 
   stomp_handle_subscribe: (frame) ->
     sub_id = frame.id or Math.random()
-    cb = (id, body) => @stomp_send_message(frame.destination, sub_id, id, body)
-    @subscriptions[sub_id] = [frame.destination, cb]
+    cb = (id, body, headers={}) => 
+      @stomp_send_message(frame.destination, sub_id, id, body, headers)
+    @subscriptions[sub_id] = 
+      destination: frame.destination
+      callback: cb
+      type: frame.headers.type
+      socket: frame.headers.socket
 
   stomp_handle_unsubscribe: (frame) ->
     if frame.id in Object.keys(@subscriptions)

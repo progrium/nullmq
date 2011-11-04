@@ -3,6 +3,12 @@ jasmine-node
 growl
 coffee-script
 
+revelations:
+ - server is not like a device. it's a shared endpoint-space
+ - no reason to re-use subscriptions. each connection/binding should have its own subscription
+ 
+
+
 v1 out of scope
  - performance
  - multipart

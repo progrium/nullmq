@@ -2,7 +2,83 @@
 {Stomp} = require('../lib/stomp.js')
 Stomp.WebSocket = require('./server.mock.js').ReflectorServerMock
 
-describe "nullmq with reflector", ->    
+describe "nullmq with reflector", ->
+  it "round robins and fans-in for PUSH-PULL pipelining", ->
+    url = "ws://endpoint"
+    received = 0
+    messages = []
+    sink = null
+    message = "Foobar"
+    ctx = new nullmq.Context url, ->
+      worker1in = ctx.socket(nullmq.PULL)
+      worker1out = ctx.socket(nullmq.PUSH)
+      worker1in.connect('/source')
+      worker1out.connect('/sink')
+      worker1in.recvall (msg) -> 
+        worker1out.send "worker1: #{msg}"
+      
+      worker2in = ctx.socket(nullmq.PULL)
+      worker2out = ctx.socket(nullmq.PUSH)
+      worker2in.connect('/source')
+      worker2out.connect('/sink')
+      worker2in.recvall (msg) -> 
+        worker2out.send "worker2: #{msg}"
+      
+      sink = ctx.socket(nullmq.PULL)
+      sink.bind('/sink')
+      sink.recvall (msg) ->
+        messages.push msg
+      
+      source = ctx.socket(nullmq.PUSH)
+      source.bind('/source')
+      source.send message
+      source.send message
+      source.send message
+      
+    waitsFor -> messages.length > 2
+    runs ->
+      expect(messages).toContain "worker1: #{message}"
+      expect(messages).toContain "worker2: #{message}"
+      expect(messages.length).toBe 3
+      ctx.term()
+      
+  it "round robin to REP sockets over several destinations from REQ socket", ->
+    url = "ws://endpoint"
+    received = 0
+    messages = []
+    req = null
+    ctx = new nullmq.Context url, ->
+      rep1 = ctx.socket(nullmq.REP)
+      rep1.connect('/destination1')
+      rep1.recvall (msg) ->
+        rep1.send "rep1"
+  
+      rep2 = ctx.socket(nullmq.REP)
+      rep2.bind('/destination2')
+      rep2.recvall (msg) ->
+        rep2.send "rep2"
+  
+      req = ctx.socket(nullmq.REQ)
+      req.connect('/destination1')
+      req.connect('/destination2')
+      req.send("foo")
+      req.recv (reply) ->
+        messages.push reply
+        received++
+      
+    waitsFor -> received > 0
+    runs ->
+      expect(messages).toContain "rep1"
+      req.send("bar")
+      req.recv (reply) ->
+        messages.push reply
+        received++
+      
+    waitsFor -> received > 1
+    runs ->
+      expect(messages).toContain "rep2"
+      ctx.term()
+      
   it "does fanout when using PUB and SUB over several destinations", ->
     url = "ws://endpoint"
     received = 0
@@ -73,4 +149,3 @@ describe "nullmq.Context", ->
       expect(socket1.closed).toEqual true
       expect(socket2.closed).toEqual true
   
-describe "nullmq.Socket", ->

@@ -1,16 +1,16 @@
 nullmq =
   # socket types
-  #PAIR: 0 # Not sold we should support PAIR
-  PUB: 1
-  SUB: 2
-  REQ: 3
-  REP: 4
-  XREQ: 5 # Deprecated in favor of DEALER
-  XREP: 6 # Deprecated in favor of ROUTER
-  PULL: 7
-  PUSH: 8
-  DEALER: 5
-  ROUTER: 6
+  #PAIR: 'pair' # Not sold we should support PAIR
+  PUB: 'pub'
+  SUB: 'sub'
+  REQ: 'req'
+  REP: 'rep'
+  XREQ: 'dealer' # Deprecated in favor of DEALER
+  XREP: 'router' # Deprecated in favor of ROUTER
+  PULL: 'pull'
+  PUSH: 'push'
+  DEALER: 'dealer'
+  ROUTER: 'router'
   
   # socket options
   HWM: 100
@@ -76,7 +76,6 @@ class nullmq.Context
   constructor: (@url, @onconnect) ->
     @client = Stomp.client(@url)
     @client.connect "guest", "guest", @onconnect
-    @connections = {}
     @sockets = []
     
   socket: (type) ->
@@ -86,37 +85,36 @@ class nullmq.Context
     assert "context is already connected", @client.connected
     for socket in @sockets
       socket.close()
-    for dest, id of @connections
-      @client.unsubscribe id
-      delete @connections[dest]
     @client.disconnect()
   
-  _send: (destination, message) ->
+  _send: (socket, destination, message) ->
     assert "context is already connected", @client.connected
+    headers = {'socket': socket.type}
+    if socket.type is nullmq.REQ
+      headers['reply-to'] = socket.connections[destination]
+    if socket.type is nullmq.REP
+      headers['reply-to'] = socket.last_recv.reply_to
     if message instanceof Array
-      transaction = Math.random()+''
+      headers['transaction'] = Math.random()+''
       @client.begin transaction
       for part in message
-        @client.send destination, {transaction}, part
+        @client.send destination, headers, part
       @client.commit transaction
     else
-      @client.send destination, {}, message.toString()
+      @client.send destination, headers, message.toString()
   
-  _connect: (destination) ->
+  _subscribe: (type, socket, destination) ->
     assert "context is already connected", @client.connected
-    if destination in Object.keys(@connections)
-      return @connections[destination]
-    else
-      id = @client.subscribe destination, (frame) =>
-        sockets = 0
-        for socket in @sockets when destination in Object.keys(socket.connections)
-          socket.recv_queue.put frame.body
-          sockets++
-        if sockets is 0 and destination in Object.keys(@connections)
-          @client.unsubscribe @connections[destination]
-          delete @connections[destination]
-      @connections[destination] = id
-      return id
+    id = @client.subscribe destination, (frame) =>
+      envelope = {'message': frame.body, 'destination': frame.destination}
+      if frame.headers['reply-to']?
+        envelope['reply_to'] = frame.headers['reply-to']
+      socket.recv_queue.put envelope
+    , {'socket': socket.type, 'type': type}
+    return id
+  
+  _connect: (socket, destination) -> @_subscribe('connect', socket, destination)
+  _bind: (socket, destination) -> @_subscribe('bind', socket, destination)
     
 
 class Socket
@@ -130,15 +128,20 @@ class Socket
     @filters = []
     @connections = {}
     @rr_index = 0
+    @last_recv = undefined
     @context.sockets.push this
-    @send_queue.watch @_dispatch_outgoing
+    if @type in [nullmq.REQ, nullmq.DEALER, nullmq.PUSH, nullmq.PUB, nullmq.ROUTER, nullmq.REP]
+      @send_queue.watch @_dispatch_outgoing
   
   connect: (destination) ->
     if destination in Object.keys(@connections) then return
-    id = @context._connect destination
+    id = @context._connect this, destination
     @connections[destination] = id
   
-  #bind: (destination) ->
+  bind: (destination) ->
+    if destination in Object.keys(@connections) then return
+    id = @context._bind this, destination
+    @connections[destination] = id
   
   setsockopt: (option, value) ->
     switch option
@@ -165,6 +168,8 @@ class Socket
       else undefined
   
   close: ->
+    for destination, id of @connections
+      @client.unsubscribe id
     @connections = {}
     @closed = true
   
@@ -175,13 +180,18 @@ class Socket
   
   recv: (callback) ->
     @recv_queue.watch => 
-      callback @recv_queue.get()
+      callback @_recv()
   
   recvall: (callback) ->
     watcher = =>
-      callback @recv_queue.get()
+      callback @_recv()
       @recv_queue.watch watcher
     @recv_queue.watch watcher
+  
+  _recv: ->
+    envelope = @recv_queue.get()
+    @last_recv = envelope
+    envelope.message
   
   _identity: (value) ->
     @identity = value
@@ -189,17 +199,20 @@ class Socket
   
   _deliver_round_robin: (message) ->
     destination = Object.keys(@connections)[@rr_index]
-    @context._send destination, message
+    @context._send this, destination, message
     connection_count = Object.keys(@connections).length
     @rr_index = ++@rr_index % connection_count
   
   _deliver_fanout: (message) ->
-    for destination, _ of @connections
-      @context._send destination, message
+    for destination, id of @connections
+      @context._send this, destination, message
   
   _deliver_routed: (message) ->
     destination = message.shift()
-    @context._send destination, message
+    @context._send this, destination, message
+  
+  _deliver_back: (message) ->
+    @context._send this, @last_recv.destination, message
   
   _dispatch_outgoing: =>
     message = @send_queue.get()
@@ -210,6 +223,8 @@ class Socket
         @_deliver_fanout message
       when nullmq.ROUTER
         @_deliver_routed message
+      when nullmq.REP
+        @_deliver_back message
       else
         assert "outgoing dispatching shouldn't happen for this socket type"
     @send_queue.watch @_dispatch_outgoing
@@ -219,6 +234,8 @@ if window?
   window.nullmq = nullmq
   if not window.Stomp?
     console.log "Required Stomp library not loaded."
+  else
+    Stomp = window.Stomp
 else
   # For testing
   exports.nullmq = nullmq
