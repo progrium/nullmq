@@ -92,72 +92,97 @@
   nullmq.Context = (function() {
     function Context(url, onconnect) {
       this.url = url;
-      this.onconnect = onconnect;
+      if (onconnect == null) {
+        onconnect = function() {};
+      }
+      this.active = false;
       this.client = Stomp.client(this.url);
-      this.client.connect("guest", "guest", this.onconnect);
+      this.client.connect("guest", "guest", __bind(function() {
+        var op, _results;
+        this.active = true;
+        _results = [];
+        while (op = this.pending_operations.shift()) {
+          _results.push(op());
+        }
+        return _results;
+      }, this));
+      this.pending_operations = [onconnect];
       this.sockets = [];
     }
     Context.prototype.socket = function(type) {
       return new Socket(this, type);
     };
     Context.prototype.term = function() {
-      var socket, _i, _len, _ref;
-      assert("context is already connected", this.client.connected);
-      _ref = this.sockets;
-      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-        socket = _ref[_i];
-        socket.close();
-      }
-      return this.client.disconnect();
+      return this._when_connected(__bind(function() {
+        var socket, _i, _len, _ref;
+        assert("context is already connected", this.client.connected);
+        _ref = this.sockets;
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          socket = _ref[_i];
+          socket.close();
+        }
+        return this.client.disconnect();
+      }, this));
     };
     Context.prototype._send = function(socket, destination, message) {
-      var headers, part, _i, _len;
-      assert("context is already connected", this.client.connected);
-      headers = {
-        'socket': socket.type
-      };
-      if (socket.type === nullmq.REQ) {
-        headers['reply-to'] = socket.connections[destination];
-      }
-      if (socket.type === nullmq.REP) {
-        headers['reply-to'] = socket.last_recv.reply_to;
-      }
-      if (message instanceof Array) {
-        headers['transaction'] = Math.random() + '';
-        this.client.begin(transaction);
-        for (_i = 0, _len = message.length; _i < _len; _i++) {
-          part = message[_i];
-          this.client.send(destination, headers, part);
+      return this._when_connected(__bind(function() {
+        var headers, part, _i, _len;
+        assert("context is already connected", this.client.connected);
+        headers = {
+          'socket': socket.type
+        };
+        if (socket.type === nullmq.REQ) {
+          headers['reply-to'] = socket.connections[destination];
         }
-        return this.client.commit(transaction);
-      } else {
-        return this.client.send(destination, headers, message.toString());
-      }
+        if (socket.type === nullmq.REP) {
+          headers['reply-to'] = socket.last_recv.reply_to;
+        }
+        if (message instanceof Array) {
+          headers['transaction'] = Math.random() + '';
+          this.client.begin(transaction);
+          for (_i = 0, _len = message.length; _i < _len; _i++) {
+            part = message[_i];
+            this.client.send(destination, headers, part);
+          }
+          return this.client.commit(transaction);
+        } else {
+          return this.client.send(destination, headers, message.toString());
+        }
+      }, this));
     };
     Context.prototype._subscribe = function(type, socket, destination) {
-      var id;
-      assert("context is already connected", this.client.connected);
-      id = this.client.subscribe(destination, __bind(function(frame) {
-        var envelope;
-        envelope = {
-          'message': frame.body,
-          'destination': frame.destination
-        };
-        if (frame.headers['reply-to'] != null) {
-          envelope['reply_to'] = frame.headers['reply-to'];
-        }
-        return socket.recv_queue.put(envelope);
-      }, this), {
-        'socket': socket.type,
-        'type': type
-      });
-      return id;
+      return this._when_connected(__bind(function() {
+        var id;
+        assert("context is already connected", this.client.connected);
+        id = this.client.subscribe(destination, __bind(function(frame) {
+          var envelope;
+          envelope = {
+            'message': frame.body,
+            'destination': frame.destination
+          };
+          if (frame.headers['reply-to'] != null) {
+            envelope['reply_to'] = frame.headers['reply-to'];
+          }
+          return socket.recv_queue.put(envelope);
+        }, this), {
+          'socket': socket.type,
+          'type': type
+        });
+        return socket.connections[destination] = id;
+      }, this));
     };
     Context.prototype._connect = function(socket, destination) {
       return this._subscribe('connect', socket, destination);
     };
     Context.prototype._bind = function(socket, destination) {
       return this._subscribe('bind', socket, destination);
+    };
+    Context.prototype._when_connected = function(op) {
+      if (this.client.connected) {
+        return op();
+      } else {
+        return this.pending_operations.push(op);
+      }
     };
     return Context;
   })();
@@ -183,20 +208,16 @@
       }
     }
     Socket.prototype.connect = function(destination) {
-      var id;
       if (__indexOf.call(Object.keys(this.connections), destination) >= 0) {
         return;
       }
-      id = this.context._connect(this, destination);
-      return this.connections[destination] = id;
+      return this.context._connect(this, destination);
     };
     Socket.prototype.bind = function(destination) {
-      var id;
       if (__indexOf.call(Object.keys(this.connections), destination) >= 0) {
         return;
       }
-      id = this.context._bind(this, destination);
-      return this.connections[destination] = id;
+      return this.context._bind(this, destination);
     };
     Socket.prototype.setsockopt = function(option, value) {
       var _ref;
@@ -305,26 +326,30 @@
     };
     Socket.prototype._dispatch_outgoing = function() {
       var message;
-      message = this.send_queue.get();
-      switch (this.type) {
-        case nullmq.REQ:
-        case nullmq.DEALER:
-        case nullmq.PUSH:
-          this._deliver_round_robin(message);
-          break;
-        case nullmq.PUB:
-          this._deliver_fanout(message);
-          break;
-        case nullmq.ROUTER:
-          this._deliver_routed(message);
-          break;
-        case nullmq.REP:
-          this._deliver_back(message);
-          break;
-        default:
-          assert("outgoing dispatching shouldn't happen for this socket type");
+      if (this.context.active) {
+        message = this.send_queue.get();
+        switch (this.type) {
+          case nullmq.REQ:
+          case nullmq.DEALER:
+          case nullmq.PUSH:
+            this._deliver_round_robin(message);
+            break;
+          case nullmq.PUB:
+            this._deliver_fanout(message);
+            break;
+          case nullmq.ROUTER:
+            this._deliver_routed(message);
+            break;
+          case nullmq.REP:
+            this._deliver_back(message);
+            break;
+          default:
+            assert("outgoing dispatching shouldn't happen for this socket type");
+        }
+        return this.send_queue.watch(this._dispatch_outgoing);
+      } else {
+        return setTimeout(this._dispatch_outgoing, 20);
       }
-      return this.send_queue.watch(this._dispatch_outgoing);
     };
     return Socket;
   })();

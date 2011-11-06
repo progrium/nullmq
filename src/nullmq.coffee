@@ -73,48 +73,58 @@ class Queue
       fn()
 
 class nullmq.Context
-  constructor: (@url, @onconnect) ->
+  constructor: (@url, onconnect=->) ->
+    @active = false
     @client = Stomp.client(@url)
-    @client.connect "guest", "guest", @onconnect
+    @client.connect "guest", "guest", =>
+      @active = true
+      op() while op = @pending_operations.shift()
+    @pending_operations = [onconnect]
     @sockets = []
-    
+  
   socket: (type) ->
     new Socket this, type
   
   term: ->
-    assert "context is already connected", @client.connected
-    for socket in @sockets
-      socket.close()
-    @client.disconnect()
+    @_when_connected =>
+      assert "context is already connected", @client.connected
+      for socket in @sockets
+        socket.close()
+      @client.disconnect()
   
   _send: (socket, destination, message) ->
-    assert "context is already connected", @client.connected
-    headers = {'socket': socket.type}
-    if socket.type is nullmq.REQ
-      headers['reply-to'] = socket.connections[destination]
-    if socket.type is nullmq.REP
-      headers['reply-to'] = socket.last_recv.reply_to
-    if message instanceof Array
-      headers['transaction'] = Math.random()+''
-      @client.begin transaction
-      for part in message
-        @client.send destination, headers, part
-      @client.commit transaction
-    else
-      @client.send destination, headers, message.toString()
+    @_when_connected =>
+      assert "context is already connected", @client.connected
+      headers = {'socket': socket.type}
+      if socket.type is nullmq.REQ
+        headers['reply-to'] = socket.connections[destination]
+      if socket.type is nullmq.REP
+        headers['reply-to'] = socket.last_recv.reply_to
+      if message instanceof Array
+        headers['transaction'] = Math.random()+''
+        @client.begin transaction
+        for part in message
+          @client.send destination, headers, part
+        @client.commit transaction
+      else
+        @client.send destination, headers, message.toString()
   
   _subscribe: (type, socket, destination) ->
-    assert "context is already connected", @client.connected
-    id = @client.subscribe destination, (frame) =>
-      envelope = {'message': frame.body, 'destination': frame.destination}
-      if frame.headers['reply-to']?
-        envelope['reply_to'] = frame.headers['reply-to']
-      socket.recv_queue.put envelope
-    , {'socket': socket.type, 'type': type}
-    return id
+    @_when_connected =>
+      assert "context is already connected", @client.connected
+      id = @client.subscribe destination, (frame) =>
+        envelope = {'message': frame.body, 'destination': frame.destination}
+        if frame.headers['reply-to']?
+          envelope['reply_to'] = frame.headers['reply-to']
+        socket.recv_queue.put envelope
+      , {'socket': socket.type, 'type': type}
+      socket.connections[destination] = id
   
   _connect: (socket, destination) -> @_subscribe('connect', socket, destination)
   _bind: (socket, destination) -> @_subscribe('bind', socket, destination)
+
+  _when_connected: (op) ->
+    if @client.connected then op() else @pending_operations.push op
     
 
 class Socket
@@ -135,13 +145,11 @@ class Socket
   
   connect: (destination) ->
     if destination in Object.keys(@connections) then return
-    id = @context._connect this, destination
-    @connections[destination] = id
+    @context._connect this, destination
   
   bind: (destination) ->
     if destination in Object.keys(@connections) then return
-    id = @context._bind this, destination
-    @connections[destination] = id
+    @context._bind this, destination
   
   setsockopt: (option, value) ->
     switch option
@@ -195,7 +203,6 @@ class Socket
   
   _identity: (value) ->
     @identity = value
-    # TODO: make queues durable
   
   _deliver_round_robin: (message) ->
     destination = Object.keys(@connections)[@rr_index]
@@ -215,19 +222,22 @@ class Socket
     @context._send this, @last_recv.destination, message
   
   _dispatch_outgoing: =>
-    message = @send_queue.get()
-    switch @type
-      when nullmq.REQ, nullmq.DEALER, nullmq.PUSH
-        @_deliver_round_robin message
-      when nullmq.PUB
-        @_deliver_fanout message
-      when nullmq.ROUTER
-        @_deliver_routed message
-      when nullmq.REP
-        @_deliver_back message
-      else
-        assert "outgoing dispatching shouldn't happen for this socket type"
-    @send_queue.watch @_dispatch_outgoing
+    if @context.active
+      message = @send_queue.get()
+      switch @type
+        when nullmq.REQ, nullmq.DEALER, nullmq.PUSH
+          @_deliver_round_robin message
+        when nullmq.PUB
+          @_deliver_fanout message
+        when nullmq.ROUTER
+          @_deliver_routed message
+        when nullmq.REP
+          @_deliver_back message
+        else
+          assert "outgoing dispatching shouldn't happen for this socket type"
+      @send_queue.watch @_dispatch_outgoing
+    else
+      setTimeout @_dispatch_outgoing, 20
 
 if window?
   # For use in the browser
