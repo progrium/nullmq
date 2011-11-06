@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head>
+    <script type="text/javascript" src="/dist/lib/stomp.js"></script>
+    <script type="text/javascript" src="/dist/nullmq.js"></script>
+    <script type="text/javascript">
+      var ctx = new nullmq.Context('ws://localhost:9000/reflector', function() {
+        console.log("connected.");
+      });
+      
+      function serve() {
+        var rep1 = ctx.socket(nullmq.REP);
+        rep1.bind('/destination1');
+        rep1.recvall(function(msg) {
+          rep1.send("rep1");
+        });
+        
+        var rep2 = ctx.socket(nullmq.REP);
+        rep2.bind('/destination2');
+        rep2.recvall(function(msg) {
+          rep2.send("rep2");
+        });
+      }
+
+      function client() {
+        var req = ctx.socket(nullmq.REQ);
+        req.connect('/destination1');
+        req.connect('/destination2');
+        return req;
+      }
+    </script>
+</head><body>
+  <a href="/test.html">Run tests</a>
+</body></html>

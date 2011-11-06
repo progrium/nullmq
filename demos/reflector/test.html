@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head>
+    <title>NullMQ Reflector</title>
+    <link rel="stylesheet" href="/dist/lib/qunit.css" media="screen" />
+    <style type="text/css">
+      #debug { background-color: #F0F0F0; font-size: 12px; height: 75%; overflow: auto; padding: 10px; z-index: 100; }
+    </style>
+    <script type="text/javascript" src='/dist/lib/jquery.min.js'></script>
+    <script type="text/javascript" src="/dist/lib/qunit.js"></script>
+    <script type="text/javascript" src="/dist/lib/stomp.js"></script>
+    <script type="text/javascript" src="/dist/nullmq.js"></script>
+    
+    <script type="text/javascript" src="/test_rr.js"></script>
+    <script type="text/javascript" src="/test_pubsub.js"></script>
+    <script type="text/javascript" src="/test_pipeline.js"></script>
+    
+    <script type="text/javascript">
+      $(document).ready(function(){
+      
+        TEST = {
+          login : "guest",
+          password : "guest",
+          url : "ws://localhost:9000/reflector",
+          timeout: 2000,
+          debug : function(str) {
+            $("#debug").append(str + "\n");
+          }
+      
+        };
+      
+        // fill server requirements:
+        $("#test_url").text(TEST.url);
+        $("#test_login").text(TEST.login);
+        $("#test_password").text(TEST.password);
+
+      });    
+    </script>
+</head><body>
+  <section>
+    <h1 id="qunit-header">NullMQ Reflector</h1>
+    <section>
+      <p>Tests requires that a Reflector Server accepting Stomp WebSocket protocol is running with the configuration:</p>
+      <ul>
+        <li>URL: <span id="test_url"></span>
+        <li>User: <span id="test_login"></span> /  <span id="test_password"></span>
+      </ul>
+    </section>
+    
+    <h2 id="qunit-banner"></h2>
+    <h2 id="qunit-userAgent"></h2>
+    <ol id="qunit-tests"></ol>
+    
+    <pre id="debug"></pre>
+  </section>
+</body></html>
