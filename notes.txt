@@ -9,18 +9,17 @@ revelations:
  
 
 
-v1 out of scope
+v0.1 out of scope
  - performance
  - multipart
- - durable queues
  - reconnects
- - linger
+ - linger?
 
 NullMQ: ZeroMQ-like sockets using STOMP over WebSocket
 
 automatic reconnects
 dynamic message batching
-queue (optionally durable)
+queue
 
 Reflector pub/sub example
 =================
