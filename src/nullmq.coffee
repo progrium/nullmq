@@ -22,6 +22,8 @@ nullmq =
   #RECONNECT_IVL: 106
   #RCVMORE: 107
   #SNDMORE: 108
+  
+  _SENDERS: ['req', 'dealer', 'push', 'pub', 'router', 'rep']
 
 assert = (description, condition=false) ->
   # We assert assumed state so we can more easily catch bugs.
@@ -140,7 +142,7 @@ class Socket
     @rr_index = 0
     @last_recv = undefined
     @context.sockets.push this
-    if @type in [nullmq.REQ, nullmq.DEALER, nullmq.PUSH, nullmq.PUB, nullmq.ROUTER, nullmq.REP]
+    if @type in nullmq._SENDERS
       @send_queue.watch @_dispatch_outgoing
   
   connect: (destination) ->
