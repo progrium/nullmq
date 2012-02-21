@@ -1,0 +1,7 @@
+{
+    "name": "nullmq"
+  , "version": "0.1.0"
+  , "dependencies" : {
+      "jasmine-node": "*"
+    }
+}
