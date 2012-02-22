@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "ffi-rzmq"
+require "presence"
+
+context = ZMQ::Context.new(1)
+server  = Presence::Server.new(context)
+
+begin
+  puts "starting server..."
+  server.start
+  puts "serving..."
+  server.run
+rescue Interrupt
+  puts "stopping server..."
+  server.stop
+end

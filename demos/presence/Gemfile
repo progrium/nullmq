@@ -1,0 +1,6 @@
+lib = File.expand_path('../lib/', __FILE__)
+$:.unshift lib unless $:.include?(lib)
+
+source "http://rubygems.org"
+
+gem "ffi-rzmq"

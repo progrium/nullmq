@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "ffi-rzmq"
+require "presence"
+
+context = ZMQ::Context.new(1)
+client  = Presence::Client.new(context, ARGV[0])
+
+begin
+  puts "connecting to server..."
+  client.connect
+  puts "connected"
+  client.run
+rescue Interrupt
+  puts "disconnecting from server..."
+  client.disconnect
+end
