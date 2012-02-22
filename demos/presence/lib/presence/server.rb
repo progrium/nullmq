@@ -3,14 +3,15 @@ require 'json'
 
 module Presence
   class Server
-    def initialize(context)
+    def initialize(context, threads=Thread)
       @context = context
+      @threads = threads
       @changes = Queue.new
       @clients = {}
-      Thread.abort_on_exception = true
     end
 
     def start
+      @threads.abort_on_exception = true
       start_pub
       start_router
       start_pull
@@ -40,8 +41,8 @@ module Presence
     private
 
     def start_pub
-      @pub = Thread.new(@context.socket(ZMQ::PUB)) do |sock|
-        thread = Thread.current
+      @pub = spawn(@context.socket(ZMQ::PUB)) do |sock|
+        thread = @threads.current
         thread[:stop] = false
 
         sock.bind('tcp://*:10001')
@@ -61,8 +62,8 @@ module Presence
     end
 
     def start_router
-      @router = Thread.new(@context.socket(ZMQ::ROUTER)) do |sock|
-        thread = Thread.current
+      @router = spawn(@context.socket(ZMQ::ROUTER)) do |sock|
+        thread = @threads.current
         thread[:stop] = false
 
         sock.bind('tcp://*:10002')
@@ -73,11 +74,19 @@ module Presence
           sock.recv_string(data = '')
           sock.send_string(address, ZMQ::SNDMORE)
           sock.send_string('', ZMQ::SNDMORE)
-          sock.send_string(JSON.generate(Hash[*(
-            @clients.dup.map do |k, v|
-              [k, {"name" => v['name'], "online" => v['online']}]
-            end.flatten
-          )]))
+          case data.chomp
+          when "list"
+            sock.send_string(JSON.generate(Hash[*(
+              @clients.dup.map do |k, v|
+                [k, {"name" => v['name'], "online" => v['online']}]
+              end.flatten
+            )]))
+          else
+            sock.send_string(JSON.generate({
+              "error" => true,
+              "reason" => "unknown"
+            }))
+          end
         end
 
         sock.close
@@ -89,15 +98,14 @@ module Presence
     end
 
     def start_pull
-      @pull = Thread.new(@context.socket(ZMQ::PULL)) do |sock|
-        thread = Thread.current
+      @pull = spawn(@context.socket(ZMQ::PULL)) do |sock|
+        thread = @threads.current
         thread[:stop] = false
 
         sock.bind('tcp://*:10003')
 
         until thread[:stop]
-          change = ''
-          sock.recv_string(change)
+          sock.recv_string(change = '')
           process_change(change)
         end
 
@@ -109,8 +117,16 @@ module Presence
       @pull[:stop] = true
     end
 
+    def spawn(socket, &block)
+      @threads.new(socket, &block)
+    end
+
     def process_change(change)
-      data = JSON.parse(change)
+      begin
+        data = JSON.parse(change)
+      rescue JSON::ParserError
+        return
+      end
       client = @clients[data["name"]] || {}
       client["last_seen"] = Time.now
       if client["online"] != data["online"]

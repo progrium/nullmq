@@ -83,7 +83,11 @@ module Presence
     end
 
     def process_change(change)
-      client = JSON.parse(change)
+      begin
+        client = JSON.parse(change)
+      rescue JSON::ParserError
+        return
+      end
       @peers[client['name']] = client
     end
 
