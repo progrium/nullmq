@@ -63,13 +63,10 @@ Client.prototype.disconnect = function() {
 };
 
 Client.prototype.requestPeers = function() {
-  console.log('requesting peer list');
-
   var req = this.context.socket(nullmq.REQ);
   req.connect('/127.0.0.1:10002');
   req.send('list');
   req.recv(function(json) {
-    console.log(json);
     try {
       var peers = JSON.parse(json);
     } catch (e) {
@@ -81,16 +78,10 @@ Client.prototype.requestPeers = function() {
 
     this.onChange();
   }.bind(this));
-
-  console.log('peer list accuired');
 }
 
 Client.prototype.clearPeers = function() {
-  console.log('clearing peer list');
-
   this.peers = {};
-
-  console.log('peer list cleared');
 }
 
 Client.prototype.getPeers = function() {
@@ -100,27 +91,18 @@ Client.prototype.getPeers = function() {
 }
 
 Client.prototype.startSub = function() {
-  console.log('starting sub');
-
   this.sub = this.context.socket(nullmq.SUB);
 
   this.sub.connect('/127.0.0.1:10001');
   this.sub.setsockopt(nullmq.SUBSCRIBE, '');
 
   this.sub.recvall(function (change) {
-    console.log(change);
     this.processChange(change);
   }.bind(this));
-
-  console.log('sub started');
 }
 
 Client.prototype.stopSub = function() {
-  console.log('stopping sub');
-
   (this.sub.close || angular.noop)();
-
-  console.log('sub stopped');
 }
 
 Client.prototype.processChange = function(change) {
@@ -134,8 +116,6 @@ Client.prototype.processChange = function(change) {
 }
 
 Client.prototype.startPush = function() {
-  console.log('starting push');
-
   this.push = this.context.socket(nullmq.PUSH);
   this.push.connect('/127.0.0.1:10003');
 
@@ -150,14 +130,8 @@ Client.prototype.startPush = function() {
       clearInterval(repeater);
     }
   }.bind(this), 1000);
-
-  console.log('push started');
 }
 
 Client.prototype.stopPush = function() {
-  console.log('stopping push');
-
   (this.push.close || angular.noop)();
-
-  console.log('push stopped');
 }
