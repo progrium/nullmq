@@ -3,14 +3,15 @@ require 'json'
 
 module Presence
   class Client
-    def initialize(context, name)
+    def initialize(context, name, threads=Thread)
       @context = context
       @name    = name
       @peers   = {}
-      Thread.abort_on_exception = true
+      @threads = threads
     end
 
     def connect
+      @threads.abort_on_exception = true
       start_sub
       request_peers
       start_push
@@ -38,19 +39,11 @@ module Presence
     private
 
     def start_sub
-      @sub = Thread.new(@context.socket(ZMQ::SUB)) do |sock|
-        thread = Thread.current
-        thread[:stop] = false
-
-        sock.connect("tcp://localhost:10001")
-        sock.setsockopt(ZMQ::SUBSCRIBE, '')
-
-        until thread[:stop]
-          sock.recv_string(change = '')
-          process_change(change)
-        end
-
-        sock.close
+      @subscribed = false
+      @sub = spawn_socket("tcp://localhost:10001", ZMQ::SUB) do |sock|
+        @subscribed = sock.setsockopt(ZMQ::SUBSCRIBE, '') == 0 unless @subscribed
+        sock.recv_string(change = '')
+        process_change(change)
       end
     end
 
@@ -59,27 +52,33 @@ module Presence
     end
 
     def start_push
-      @push = Thread.new(@context.socket(ZMQ::PUSH)) do |sock|
-        thread = Thread.current
-        thread[:stop] = false
-
-        sock.connect("tcp://localhost:10003")
-
-        until thread[:stop]
-          sock.send_string(JSON.generate({
-            "name" => @name,
-            "online" => true,
-            "timeout" => 2
-          }))
-          sleep(1)
-        end
-
-        sock.close
+      @push = spawn_socket("tcp://localhost:10003", ZMQ::PUSH) do |sock|
+        sock.send_string(JSON.generate({
+          "name" => @name,
+          "online" => true,
+          "timeout" => 2
+        }))
+        sleep(1)
       end
     end
 
     def stop_push
       @push[:stop] = true
+    end
+
+    def spawn_socket(endpoint, socket_type)
+      @threads.new(@context.socket(socket_type)) do |sock|
+        thread = @threads.current
+        thread[:stop] = false
+
+        sock.connect(endpoint)
+
+        until thread[:stop]
+          yield sock
+        end
+
+        sock.close
+      end
     end
 
     def process_change(change)

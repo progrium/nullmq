@@ -41,19 +41,10 @@ module Presence
     private
 
     def start_pub
-      @pub = spawn(@context.socket(ZMQ::PUB)) do |sock|
-        thread = @threads.current
-        thread[:stop] = false
-
-        sock.bind('tcp://*:10001')
-
-        until thread[:stop]
-          change = @changes.pop
-          $stdout << change+"\r\n"
-          sock.send_string(change)
-        end
-
-        sock.close
+      @pub = spawn_socket('tcp://*:10001', ZMQ::PUB) do |sock|
+        change = @changes.pop
+        $stdout << change+"\r\n"
+        sock.send_string(change)
       end
     end
 
@@ -62,34 +53,25 @@ module Presence
     end
 
     def start_router
-      @router = spawn(@context.socket(ZMQ::ROUTER)) do |sock|
-        thread = @threads.current
-        thread[:stop] = false
-
-        sock.bind('tcp://*:10002')
-
-        until thread[:stop]
-          sock.recv_string(address = '')
-          sock.recv_string('')
-          sock.recv_string(data = '')
-          sock.send_string(address, ZMQ::SNDMORE)
-          sock.send_string('', ZMQ::SNDMORE)
-          case data.chomp
-          when "list"
-            sock.send_string(JSON.generate(Hash[*(
-              @clients.dup.map do |k, v|
-                [k, {"name" => v['name'], "online" => v['online']}]
-              end.flatten
-            )]))
-          else
-            sock.send_string(JSON.generate({
-              "error" => true,
-              "reason" => "unknown"
-            }))
-          end
+      @router = spawn_socket('tcp://*:10002', ZMQ::ROUTER) do |sock|
+        sock.recv_string(address = '')
+        sock.recv_string('') if sock.more_parts?
+        sock.recv_string(data = '') if sock.more_parts?
+        sock.send_string(address, ZMQ::SNDMORE)
+        sock.send_string('', ZMQ::SNDMORE)
+        case data
+        when "list"
+          sock.send_string(JSON.generate(Hash[*(
+            @clients.dup.map do |k, v|
+              [k, {"name" => k, "online" => v['online']}]
+            end.flatten
+          )]))
+        else
+          sock.send_string(JSON.generate({
+            "error" => true,
+            "reason" => "unknown"
+          }))
         end
-
-        sock.close
       end
     end
 
@@ -98,18 +80,9 @@ module Presence
     end
 
     def start_pull
-      @pull = spawn(@context.socket(ZMQ::PULL)) do |sock|
-        thread = @threads.current
-        thread[:stop] = false
-
-        sock.bind('tcp://*:10003')
-
-        until thread[:stop]
-          sock.recv_string(change = '')
-          process_change(change)
-        end
-
-        sock.close
+      @pull = spawn_socket('tcp://*:10003', ZMQ::PULL) do |sock|
+        sock.recv_string(change = '')
+        process_change(change)
       end
     end
 
@@ -117,8 +90,19 @@ module Presence
       @pull[:stop] = true
     end
 
-    def spawn(socket, &block)
-      @threads.new(socket, &block)
+    def spawn_socket(endpoint, socket_type)
+      @threads.new(@context.socket(socket_type)) do |sock|
+        sock.bind(endpoint)
+
+        thread = @threads.current
+        thread[:stop] = false
+
+        until thread[:stop]
+          yield sock
+        end
+
+        sock.close
+      end
     end
 
     def process_change(change)
