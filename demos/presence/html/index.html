@@ -32,8 +32,8 @@
                 <h3>
                   {{peer.name}}
                   <ng:switch on="peer.online" >
-                    <small ng:switch-when="true">online</small>
-                    <small ng:switch-when="false">offline</small>
+                    <small class="label label-success" ng:switch-when="true">online</small>
+                    <small class="label label-important" ng:switch-when="false">offline</small>
                   </ng:switch>
                 </h3>
               </div>

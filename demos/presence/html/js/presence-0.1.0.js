@@ -1,16 +1,21 @@
-function MainController() {
+MainController.$inject = ['$updateView'];
+function MainController($updateView) {
   this.STATUS_CONNECTING    = Client.CONNECTING;
   this.STATUS_CONNECTED     = Client.CONNECTED;
   this.STATUS_DISCONNECTED  = Client.DISCONNECTED;
   this.STATUS_DISCONNECTING = Client.DISCONNECTING;
 
   this.client = new Client();
+  this.client.onChange = $updateView;
+
   this.connect = function() {
     this.client.connect();
   }.bind(this);
   this.disconnect = function() {
     this.client.disconnect();
   }.bind(this);
+
+  scope = this;
 }
 
 Client.CONNECTING = 2;
@@ -22,6 +27,7 @@ function Client() {
   this.name;
   this.status = Client.DISCONNECTED;
   this.peers = {};
+  this.onChange = function() {};
 };
 
 Client.prototype.connect = function() {
@@ -29,7 +35,7 @@ Client.prototype.connect = function() {
     return;
   }
 
-  this.context = new nullmq.Context('ws://localhost:9000/bridge');
+  this.context = new nullmq.Context('ws://localhost:9000');
   this.status = Client.CONNECTING;
 
   this.startSub();
@@ -60,9 +66,10 @@ Client.prototype.requestPeers = function() {
   console.log('requesting peer list');
 
   var req = this.context.socket(nullmq.REQ);
-  req.connect('/localhost:10002');
+  req.connect('/127.0.0.1:10002');
   req.send('list');
   req.recv(function(json) {
+    console.log(json);
     try {
       var peers = JSON.parse(json);
     } catch (e) {
@@ -71,6 +78,8 @@ Client.prototype.requestPeers = function() {
     Object.keys(peers).forEach(function(name) {
       this.peers[name] = peers[name];
     }.bind(this));
+
+    this.onChange();
   }.bind(this));
 
   console.log('peer list accuired');
@@ -85,7 +94,7 @@ Client.prototype.clearPeers = function() {
 }
 
 Client.prototype.getPeers = function() {
-  Object.keys(this.peers).map(function(key) {
+  return Object.keys(this.peers).map(function(key) {
     return this.peers[key];
   }.bind(this));
 }
@@ -95,10 +104,11 @@ Client.prototype.startSub = function() {
 
   this.sub = this.context.socket(nullmq.SUB);
 
-  this.sub.connect('/localhost:10001');
+  this.sub.connect('/127.0.0.1:10001');
   this.sub.setsockopt(nullmq.SUBSCRIBE, '');
 
   this.sub.recvall(function (change) {
+    console.log(change);
     this.processChange(change);
   }.bind(this));
 
@@ -120,13 +130,14 @@ Client.prototype.processChange = function(change) {
     return;
   }
   this.peers[peer['name']] = peer;
+  this.onChange();
 }
 
 Client.prototype.startPush = function() {
   console.log('starting push');
 
   this.push = this.context.socket(nullmq.PUSH);
-  this.push.connect('/localhost:10003');
+  this.push.connect('/127.0.0.1:10003');
 
   var repeater = setInterval(function() {
     if (this.status == Client.CONNECTED) {
