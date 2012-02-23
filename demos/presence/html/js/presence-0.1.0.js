@@ -20,7 +20,6 @@ Client.DISCONNECTING = 3;
 
 function Client() {
   this.name;
-  this.context = new nullmq.Context('ws://localhost:9000/presence');
   this.status = Client.DISCONNECTED;
   this.peers = {};
 };
@@ -30,6 +29,7 @@ Client.prototype.connect = function() {
     return;
   }
 
+  this.context = new nullmq.Context('ws://localhost:9000/bridge');
   this.status = Client.CONNECTING;
 
   this.startSub();
@@ -52,13 +52,15 @@ Client.prototype.disconnect = function() {
   this.context.term();
 
   this.status = Client.DISCONNECTED;
+
+  delete this.context;
 };
 
 Client.prototype.requestPeers = function() {
   console.log('requesting peer list');
 
   var req = this.context.socket(nullmq.REQ);
-  req.connect('/peers');
+  req.connect('/localhost:10002');
   req.send('list');
   req.recv(function(json) {
     try {
@@ -93,7 +95,7 @@ Client.prototype.startSub = function() {
 
   this.sub = this.context.socket(nullmq.SUB);
 
-  this.sub.connect('/updates');
+  this.sub.connect('/localhost:10001');
   this.sub.setsockopt(nullmq.SUBSCRIBE, '');
 
   this.sub.recvall(function (change) {
@@ -124,10 +126,10 @@ Client.prototype.startPush = function() {
   console.log('starting push');
 
   this.push = this.context.socket(nullmq.PUSH);
-  this.push.connect('/heartbeat');
+  this.push.connect('/localhost:10003');
 
   var repeater = setInterval(function() {
-    if (this.status == this.CONNECTED) {
+    if (this.status == Client.CONNECTED) {
       this.push.send(JSON.stringify({
           name: this.name
         , online: true
