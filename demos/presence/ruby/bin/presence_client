@@ -1,0 +1,65 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "ffi-rzmq"
+require "clone"
+require "json"
+require "thread"
+
+@peers = {}
+@name = ARGV[0]
+@text = ARGV[1]
+@heartbeats = Queue.new
+
+client = Clone::Client.new(ZMQ::Context.new(1), {
+  :subscribe => "tcp://localhost:10001",
+  :request   => "tcp://localhost:10002",
+  :push      => "tcp://localhost:10003"
+})
+
+client.request do |initial_payload|
+  begin
+    peers = JSON.parse(initial_payload)
+    peers.each do |name, peer|
+      @peers[name] = peer
+    end
+  rescue JSON::ParserError
+  end
+end
+
+client.on_publish do |payload|
+  begin
+    peer = JSON.parse(payload)
+    @peers[peer['name']] ||= {}
+    @peers[peer['name']].merge!(peer)
+  rescue JSON::ParserError
+  end
+end
+
+client.push do
+  @heartbeats.pop
+end
+
+begin
+  $stdout << "connecting...\r\n"
+  client.connect
+  loop do
+    @heartbeats << JSON.generate({
+      "name" => @name,
+      "text" => @text,
+      "online" => true,
+      "timeout" => 2
+    })
+    sleep(1)
+  end
+rescue Interrupt
+  $stdout << "disconnecting...\r\n"
+  @heartbeats << JSON.generate({
+    "name" => @name,
+    "text" => @text,
+    "online" => false
+  })
+  client.disconnect
+end

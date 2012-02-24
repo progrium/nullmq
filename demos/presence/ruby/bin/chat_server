@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "ffi-rzmq"
+require "clone"
+require "json"
+require "thread"
+
+@messages = []
+@updates = Queue.new
+
+server = Clone::Server.new(ZMQ::Context.new(1), {
+  :publish => "tcp://*:10004",
+  :router  => "tcp://*:10005",
+  :pull    => "tcp://*:10006"
+})
+
+server.on_request do
+  JSON.generate(@messages.dup)
+end
+
+server.on_push do |payload|
+  begin
+    message = JSON.parse(payload)
+    message['timestamp'] = Time.now
+    @updates << JSON.generate(message)
+  rescue JSON::ParserError
+  end
+end
+
+server.publish do
+  @updates.pop
+end
+
+begin
+  puts "starting server...\r\n"
+  server.start
+  loop do
+    # do nothing, since 
+    sleep()
+  end
+rescue Interrupt
+  puts "stopping server...\r\n"
+  server.stop
+end
