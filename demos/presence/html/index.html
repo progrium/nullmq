@@ -36,7 +36,7 @@
             <h2 ng:switch-default>Client status: {{presenceClient.status}}</h2>
             </ng:switch>
             <form class="well form-inline" ng:submit="connect()">
-              <input class="input-small" type="text" name="name" placeholder="Client Name" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
+              <input class="input-small" type="text" name="name" placeholder="Client Name" ng:disabled="{{presenceClient.status == STATUS_CONNECTED}}" />
               <input class="input-large" type="text" name="text" placeholder="Status Text" ng:disabled="{{presenceClient.status == STATUS_CONNECTED}}" />
               <input type="submit" class="btn btn-primary" value="Connect" ng:show="presenceClient.status == STATUS_DISCONNECTED" />
               <a class="btn btn-danger" ng:click="disconnect()" ng:show="presenceClient.status == STATUS_CONNECTED">Disconnect</a>
