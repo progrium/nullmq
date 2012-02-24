@@ -5,6 +5,18 @@
     <title>Presence</title>
     <link href="css/bootstrap-2.0.1.css" rel="stylesheet">
     <link href="css/bootstrap-responsive-2.0.1.css" rel="stylesheet">
+    <style>
+    table.table tr td.timestamp,
+    table.table tr td.name {
+      width: 10%;
+    }
+    table.table tr td.text {
+      width: 80%;
+    }
+    table.table tr td.name {
+      font-weight: bold;
+    }
+    </style>
   </head>
   <body ng:controller="MainController">
     <div class="container">
@@ -48,14 +60,16 @@
             </div>
           </div>
           <div class="span7">
-            <ul>
-              <li ng:repeat="message in messages">
-                <span>[{{message.timestamp}}]</span>
-                <span><{{message.name}}></span>
-                <span>{{message.text}}</span>
-              </li>
-            </ul>
-            <form ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
+            <table class="table table-striped">
+              <tbody>
+                <tr ng:repeat="message in messages">
+                  <td class="timestamp">[{{message.timestamp|timestamp}}]</td>
+                  <td class="name"><{{message.name}}></td>
+                  <td class="body">{{message.text}}</td>
+                </tr>
+              </tbody>
+            </table>
+            <form class="form-inline" ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
               <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
               <input type="submit" class="btn" value="Send" />
             </form>
@@ -67,5 +81,11 @@
     <script type="text/javascript" src="js/stomp-0.1.0.js"></script>
     <script type="text/javascript" src="js/nullmq-0.1.0.js"></script>
     <script type="text/javascript" src="js/presence-0.1.0.js"></script>
+    <script type="text/javascript">
+      angular.filter('timestamp', function(input) {
+        var timestamp = new Date(input);
+        return timestamp.getHours()+':'+timestamp.getMinutes()+':'+timestamp.getSeconds();
+      });
+    </script>
   </body>
 </html>

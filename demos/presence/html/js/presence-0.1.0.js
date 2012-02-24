@@ -14,9 +14,9 @@ function MainController($updateView) {
   }.bind(this);
 
   this.presenceClient = new Client({
-      subscribe: "/localhost:10001"
-    , request:   "/localhost:10002"
-    , push:      "/localhost:10003"
+      subscribe: "tcp://localhost:10001"
+    , request:   "tcp://localhost:10002"
+    , push:      "tcp://localhost:10003"
   });
   this.presenceClient.onResponse = function(payload) {
     Object.merge(this.peers, JSON.parse(payload));
@@ -46,9 +46,9 @@ function MainController($updateView) {
 
   this.messages = [];
   this.chatClient = new Client({
-      subscribe: "/localhost:10004"
-    , request:   "/localhost:10005"
-    , push:      "/localhost:10006"
+      subscribe: "tcp://localhost:10004"
+    , request:   "tcp://localhost:10005"
+    , push:      "tcp://localhost:10006"
   });
   this.chatClient.onResponse = function(payload) {
     JSON.parse(payload).forEach(function(msg) {
