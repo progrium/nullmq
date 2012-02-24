@@ -4,10 +4,11 @@ require 'json'
 module Presence
   class Server
     def initialize(context, threads=Thread)
-      @context = context
-      @threads = threads
-      @changes = Queue.new
-      @clients = {}
+      @context  = context
+      @threads  = threads
+      @changes  = Queue.new
+      @messages = Queue.new
+      @clients  = {}
     end
 
     def start
@@ -15,12 +16,16 @@ module Presence
       start_pub
       start_router
       start_pull
+      start_message_pull
+      start_message_pub
     end
 
     def stop
       stop_pub
       stop_router
       stop_pull
+      stop_message_pull
+      stop_message_pub
       @context.terminate
     end
 
@@ -129,6 +134,42 @@ module Presence
       end
       client["timeout"] = data["timeout"]
       @clients[data["name"]] = client unless @clients[data["name"]]
+    end
+
+    def start_message_pull
+      @message_pull = spawn_socket('tcp://*:10004', ZMQ::PULL) do |sock|
+        sock.recv_string(change = '')
+        process_message(change)
+      end
+    end
+
+    def stop_message_pull
+      @message_pull[:stop] = true
+    end
+
+    def process_message(raw)
+      begin
+        data = JSON.parse(raw)
+      rescue JSON::ParserError
+        return
+      end
+
+      @messages << JSON.generate({
+        "name" => data['name'],
+        "text" => data['text'],
+        "timestamp" => Time.now
+      })
+    end
+
+    def start_message_pub
+      @message_pub = spawn_socket('tcp://*:10005', ZMQ::PUB) do |sock|
+        message = @messages.pop
+        sock.send_string(message)
+      end
+    end
+
+    def stop_message_pub
+      @message_pub[:stop] = true
     end
   end
 end

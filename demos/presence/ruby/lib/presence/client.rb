@@ -4,10 +4,11 @@ require 'json'
 module Presence
   class Client
     def initialize(context, name, text=nil, threads=Thread)
-      @context = context
-      @name    = name
-      @peers   = {}
-      @threads = threads
+      @context  = context
+      @name     = name
+      @peers    = {}
+      @threads  = threads
+      @messages = Queue.new
     end
 
     def connect
@@ -15,11 +16,15 @@ module Presence
       start_sub
       request_peers
       start_push
+      start_message_sub
+      start_message_push
     end
 
     def disconnect
       stop_sub
       stop_push
+      stop_message_sub
+      stop_message_push
       @context.terminate
     end
 
@@ -31,6 +36,8 @@ module Presence
             $stdout.puts @peers.inspect
           when "text"
             @text = $stdin.gets.chomp
+          when "say"
+            @messages << $stdin.gets.chomp
           when "quit"
             break
           end
@@ -90,6 +97,7 @@ module Presence
       rescue JSON::ParserError
         return
       end
+      @peers[client['name']] ||= {}
       @peers[client['name']].merge!(client)
     end
 
@@ -99,11 +107,54 @@ module Presence
 
       request.send_string('list')
       request.recv_string(data = '')
-      JSON.parse(data).each do |name, peer|
+      begin
+        peers = JSON.parse(data)
+      rescue JSON::ParserError
+        peers = []
+      end
+
+      peers.each do |name, peer|
         @peers[name] = peer
       end
 
       request.close
+    end
+
+    def start_message_sub
+      @message_subscribed = false
+      @message_sub = spawn_socket("tcp://localhost:10005", ZMQ::SUB) do |sock|
+        @message_subscribed = sock.setsockopt(ZMQ::SUBSCRIBE, '') == 0 unless @message_subscribed
+        sock.recv_string(message = '')
+        process_message(message)
+      end
+    end
+
+    def stop_message_sub
+      @message_sub[:stop] = true
+    end
+
+    def process_message(message)
+      begin
+        data = JSON.parse(message)
+      rescue JSON::ParserError
+        return
+      end
+      $stdout << sprintf("[%s] <%s> %s", data['timestamp'], data['name'], data['text'])
+      $stdout << "\r\n"
+    end
+
+    def start_message_push
+      @message_push = spawn_socket("tcp://localhost:10004", ZMQ::PUSH) do |sock|
+        message = @messages.pop
+        sock.send_string(JSON.generate({
+          "name" => @name,
+          "text" => message
+        }))
+      end
+    end
+
+    def stop_message_push
+      @message_push[:stop] = true
     end
   end
 end
