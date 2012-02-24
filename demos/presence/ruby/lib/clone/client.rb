@@ -21,7 +21,7 @@ module Clone
       @context.terminate
     end
 
-    def request(&block)
+    def on_response(&block)
       @request_handler = block
     end
 

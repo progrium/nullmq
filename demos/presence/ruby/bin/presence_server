@@ -17,7 +17,7 @@ server = Clone::Server.new(ZMQ::Context.new(1), {
   :pull    => "tcp://*:10003"
 })
 
-server.on_request do
+server.on_request do |payload|
   JSON.generate(Hash[*(@clients.dup.map do |k, v|
     [k, {"name" => k, "online" => v['online'], "text" => v['text']}]
   end.flatten)])

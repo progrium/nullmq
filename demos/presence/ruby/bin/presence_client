@@ -19,9 +19,9 @@ client = Clone::Client.new(ZMQ::Context.new(1), {
   :push      => "tcp://localhost:10003"
 })
 
-client.request do |initial_payload|
+client.on_response do |payload|
   begin
-    peers = JSON.parse(initial_payload)
+    peers = JSON.parse(payload)
     peers.each do |name, peer|
       @peers[name] = peer
     end

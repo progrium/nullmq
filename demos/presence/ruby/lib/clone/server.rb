@@ -51,7 +51,6 @@ module Clone
     def start_pub
       @pub = spawn_socket(@options[:publish], ZMQ::PUB) do |sock|
         pub = @pub_handler.call
-        $stdout << pub+"\r\n"
         sock.send_string(pub)
       end
     end
@@ -65,10 +64,10 @@ module Clone
       @router = spawn_socket(@options[:router], ZMQ::ROUTER) do |sock|
         sock.recv_string(address = '')
         sock.recv_string('') if sock.more_parts?
-        sock.recv_string('') if sock.more_parts?
+        sock.recv_string(data = '') if sock.more_parts?
         sock.send_string(address, ZMQ::SNDMORE)
         sock.send_string('', ZMQ::SNDMORE)
-        sock.send_string(@router_handler.call)
+        sock.send_string(@router_handler.call(data))
       end
     end
 

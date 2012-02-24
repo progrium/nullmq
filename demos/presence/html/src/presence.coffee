@@ -1,3 +1,13 @@
 class Client:
-  constructor: ->
-    @onChange = ->
+  constructor: (@context, @options) ->
+
+  connect: ->
+      
+
+  disconnect: ->
+
+  onRequest: (callback) ->
+
+  onPublish: (callback) ->
+
+  push: (callback) ->

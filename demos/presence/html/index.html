@@ -16,20 +16,20 @@
       <section id="main">
         <div class="row">
           <div class="span5">
-            <ng:switch on="client.status">
+            <ng:switch on="presenceClient.status">
             <h2 ng:switch-when="2">Connecting...</h2>
-            <h2 ng:switch-when="0">You are connected as {{client.name}}</h2>
+            <h2 ng:switch-when="0">You are connected as {{name}}</h2>
             <h2 ng:switch-when="3">Disconnecting...</h2>
             <h2 ng:switch-when="1">You are not connected</h2>
-            <h2 ng:switch-default>Client status: {{client.status}}</h2>
+            <h2 ng:switch-default>Client status: {{presenceClient.status}}</h2>
             </ng:switch>
             <form class="well form-inline" ng:submit="connect()">
-              <input class="input-small" type="text" name="client.name" placeholder="Client Name" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
-              <input class="input-large" type="text" name="client.text" placeholder="Status Text" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
-              <input type="submit" class="btn btn-primary" value="Connect" ng:show="client.status == STATUS_DISCONNECTED" />
-              <a class="btn btn-danger" ng:click="disconnect()" ng:show="client.status == STATUS_CONNECTED">Disconnect</a>
+              <input class="input-small" type="text" name="name" placeholder="Client Name" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
+              <input class="input-large" type="text" name="text" placeholder="Status Text" ng:disabled="{{presenceClient.status == STATUS_CONNECTED}}" />
+              <input type="submit" class="btn btn-primary" value="Connect" ng:show="presenceClient.status == STATUS_DISCONNECTED" />
+              <a class="btn btn-danger" ng:click="disconnect()" ng:show="presenceClient.status == STATUS_CONNECTED">Disconnect</a>
             </form>
-            <div class="row" ng:show="client.getPeers().length > 0" ng:repeat="peer in client.getPeers()">
+            <div class="row" ng:show="getPeers().length > 0" ng:repeat="peer in getPeers()">
               <div class="span12">
                 <h3>
                   <ng:switch on="peer.online" >
@@ -41,7 +41,7 @@
                 </h3>
               </div>
             </div>
-            <div class="row" ng:hide="client.getPeers().length > 0">
+            <div class="row" ng:hide="getPeers().length > 0">
               <div class="span12">
                 <h3>No peers online</h3>
               </div>
@@ -55,7 +55,7 @@
                 <span>{{message.text}}</span>
               </li>
             </ul>
-            <form ng:submit="sendMessage()" ng:show="client.status == STATUS_CONNECTED">
+            <form ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
               <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
               <input type="submit" class="btn" value="Send" />
             </form>

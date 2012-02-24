@@ -5,30 +5,87 @@ function MainController($updateView) {
   this.STATUS_DISCONNECTED  = Client.DISCONNECTED;
   this.STATUS_DISCONNECTING = Client.DISCONNECTING;
 
-  this.messages = []
-  this.client = new Client();
-  this.client.onChange = $updateView;
-  this.client.processMessage = function(message) {
-    this.messages.push(message);
+  this.peers = {};
+
+  this.getPeers = function() {
+    return Object.keys(this.peers).map(function(name) {
+      return this.peers[name]
+    }.bind(this))
+  }.bind(this);
+
+  this.presenceClient = new Client({
+      subscribe: "/localhost:10001"
+    , request:   "/localhost:10002"
+    , push:      "/localhost:10003"
+  });
+  this.presenceClient.onResponse = function(payload) {
+    Object.merge(this.peers, JSON.parse(payload));
+    $updateView();
+  }.bind(this);
+  this.presenceClient.onPublish = function(payload) {
+    var peer = JSON.parse(payload);
+    this.peers[peer['name']] = this.peers[peer['name']] || {}
+    Object.merge(this.peers[peer['name']], peer);
+    $updateView();
+  }.bind(this);
+  var interval;
+  this.presenceClient.onConnect = function() {
+    interval = setInterval(function() {
+      this.presenceClient.push(JSON.stringify({
+          name: this.name
+        , online: true
+        , text: this.text
+        , timeout: 2
+      }));
+    }.bind(this), 1000);
+  }.bind(this);
+  this.presenceClient.onDisconnect = function() {
+    clearInterval(interval);
+    this.peers = {};
+  }.bind(this);
+
+  this.messages = [];
+  this.chatClient = new Client({
+      subscribe: "/localhost:10004"
+    , request:   "/localhost:10005"
+    , push:      "/localhost:10006"
+  });
+  this.chatClient.onResponse = function(payload) {
+    JSON.parse(payload).forEach(function(msg) {
+      this.messages.push(msg);
+    }.bind(this));
+    $updateView();
+  }.bind(this);
+  this.chatClient.onPublish = function(payload) {
+    var msg = JSON.parse(payload);
+    this.messages.push(msg);
+    $updateView();
+  }.bind(this);
+  this.chatClient.onDisconnect = function() {
+    this.messages = []
+  }.bind(this);
+
+  this.sendMessage = function() {
+    if (this.message) {
+      this.chatClient.push(JSON.stringify({
+          name: this.name
+        , text: this.message
+      }));
+      this.message = '';
+    }
+  }.bind(this)
+
+  this.connect = function() {
+    this.presenceClient.connect();
+    this.chatClient.connect();
     $updateView();
   }.bind(this);
 
-  this.connect = function() {
-    this.client.connect();
-  }.bind(this);
   this.disconnect = function() {
-    this.client.disconnect();
+    this.presenceClient.disconnect();
+    this.chatClient.disconnect();
+    $updateView();
   }.bind(this);
-  this.sendMessage = function() {
-    if (!this.message) {
-      return;
-    }
-
-    this.client.sendMessage(this.message);
-    this.message = '';
-  }.bind(this);
-
-  scope = this;
 }
 
 Client.CONNECTING = 2;
@@ -36,11 +93,14 @@ Client.CONNECTED = 0;
 Client.DISCONNECTED = 1;
 Client.DISCONNECTING = 3;
 
-function Client() {
-  this.name;
+function Client(options) {
   this.status = Client.DISCONNECTED;
-  this.peers = {};
-  this.onChange = function() {};
+  this.options = options;
+
+  this.onResponse = function(payload) {};
+  this.onPublish = function(payload) {};
+  this.onConnect = function() {};
+  this.onDisconnect = function() {};
 };
 
 Client.prototype.connect = function() {
@@ -52,12 +112,12 @@ Client.prototype.connect = function() {
   this.status = Client.CONNECTING;
 
   this.startSub();
-  this.requestPeers();
+  this.doRequest();
   this.startPush();
-  this.startMessageSub();
-  this.startMessagePush();
 
   this.status = Client.CONNECTED;
+
+  this.onConnect();
 };
 
 Client.prototype.disconnect = function() {
@@ -68,128 +128,49 @@ Client.prototype.disconnect = function() {
   this.status = Client.DISCONNECTING;
 
   this.stopSub();
-  this.clearPeers();
   this.stopPush();
-  this.stopMessageSub();
-  this.stopMessagePush();
   this.context.term();
+  delete this.context;
 
   this.status = Client.DISCONNECTED;
 
-  delete this.context;
+  this.onDisconnect();
 };
 
-Client.prototype.requestPeers = function() {
+Client.prototype.doRequest = function() {
   var req = this.context.socket(nullmq.REQ);
-  req.connect('/127.0.0.1:10002');
-  req.send('list');
-  req.recv(function(json) {
-    try {
-      var peers = JSON.parse(json);
-    } catch (e) {
-      return;
-    }
-    Object.keys(peers).forEach(function(name) {
-      this.peers[name] = peers[name];
-    }.bind(this));
-
-    this.onChange();
-  }.bind(this));
-}
-
-Client.prototype.clearPeers = function() {
-  this.peers = {};
-}
-
-Client.prototype.getPeers = function() {
-  return Object.keys(this.peers).map(function(key) {
-    return this.peers[key];
-  }.bind(this));
+  req.connect(this.options['request']);
+  req.send('');
+  req.recv(this.onResponse);
 }
 
 Client.prototype.startSub = function() {
-  this.sub = this.context.socket(nullmq.SUB);
+  this.subSock = this.context.socket(nullmq.SUB);
 
-  this.sub.connect('/127.0.0.1:10001');
-  this.sub.setsockopt(nullmq.SUBSCRIBE, '');
+  this.subSock.connect(this.options['subscribe']);
+  this.subSock.setsockopt(nullmq.SUBSCRIBE, '');
 
-  this.sub.recvall(function(change) {
-    this.processChange(change);
-  }.bind(this));
+  this.subSock.recvall(this.onPublish);
 }
 
 Client.prototype.stopSub = function() {
-  (this.sub.close || angular.noop)();
-}
-
-Client.prototype.processChange = function(change) {
-  try {
-    var peer = JSON.parse(change);
-  } catch (e) {
-    return;
-  }
-  this.peers[peer['name']] = this.peers[peer['name']] || {};
-
-  Object.merge(this.peers[peer['name']], peer);
-  this.onChange();
+  (this.subSock.close || angular.noop)();
 }
 
 Client.prototype.startPush = function() {
-  this.push = this.context.socket(nullmq.PUSH);
-  this.push.connect('/127.0.0.1:10003');
-
-  var repeater = setInterval(function() {
-    if (this.status == Client.CONNECTED) {
-      this.push.send(JSON.stringify({
-          name: this.name
-        , online: true
-        , text: this.text
-        , timeout: 2
-      }));
-    } else {
-      clearInterval(repeater);
-    }
-  }.bind(this), 1000);
+  this.pushSock = this.context.socket(nullmq.PUSH);
+  this.pushSock.connect(this.options['push']);
 }
 
 Client.prototype.stopPush = function() {
-  (this.push.close || angular.noop)();
+  (this.pushSock.close || angular.noop)();
 }
 
-
-Client.prototype.startMessageSub = function() {
-  this.messageSub = this.context.socket(nullmq.SUB);
-
-  this.messageSub.connect('/127.0.0.1:10005');
-  this.messageSub.setsockopt(nullmq.SUBSCRIBE, '');
-
-  this.messageSub.recvall(function(message) {
-    this.processMessage(JSON.parse(message));
-  }.bind(this));
-}
-
-Client.prototype.stopMessageSub = function() {
-  (this.messageSub.close || angular.noop)();
-}
-
-Client.prototype.startMessagePush = function() {
-  this.messagePush = this.context.socket(nullmq.PUSH);
-  this.messagePush.connect('/127.0.0.1:10004');
-}
-
-Client.prototype.sendMessage = function(message) {
+Client.prototype.push = function(payload) {
   if (this.status != Client.CONNECTED) {
     return;
   }
-
-  this.messagePush.send(JSON.stringify({
-      name: this.name
-    , text: message
-  }));
-}
-
-Client.prototype.stopMessagePush = function() {
-  (this.messagePush.close || angular.noop)();
+  this.pushSock.send(payload);
 }
 
 Object.merge = function(destination, source) {

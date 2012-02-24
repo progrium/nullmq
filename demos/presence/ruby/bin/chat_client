@@ -18,7 +18,7 @@ client = Clone::Client.new(ZMQ::Context.new(1), {
   :push      => "tcp://localhost:10006"
 })
 
-client.request do |payload|
+client.on_response do |payload|
   begin
     messages = JSON.parse(payload)
     messages.each do |msg|

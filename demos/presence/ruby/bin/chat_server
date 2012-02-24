@@ -17,7 +17,7 @@ server = Clone::Server.new(ZMQ::Context.new(1), {
   :pull    => "tcp://*:10006"
 })
 
-server.on_request do
+server.on_request do |payload|
   JSON.generate(@messages.dup)
 end
 
@@ -25,20 +25,23 @@ server.on_push do |payload|
   begin
     message = JSON.parse(payload)
     message['timestamp'] = Time.now
+    @messages << message
     @updates << JSON.generate(message)
   rescue JSON::ParserError
   end
 end
 
 server.publish do
-  @updates.pop
+  update = @updates.pop
+  $stdout << update+"\r\n"
+  update
 end
 
 begin
   puts "starting server...\r\n"
   server.start
   loop do
-    # do nothing, since 
+    # do nothing, since
     sleep()
   end
 rescue Interrupt

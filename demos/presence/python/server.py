@@ -30,7 +30,6 @@ class ZeroMQBridge(object):
         self.connection_by_destination = collections.defaultdict(set)
 
     def __call__(self, frame, payload):
-        print frame
         if frame is None or frame.command == 'DISCONNECT':
             for connection in payload:
                 self.close(connection)
