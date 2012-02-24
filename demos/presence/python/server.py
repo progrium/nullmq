@@ -87,6 +87,6 @@ if __name__ == '__main__':
     def websocket_handler(websocket, environ):
         StompHandler(websocket, ZeroMQBridge()).serve()
 
-    server = WebSocketServer(('127.0.0.1', 9000), websocket_handler)
+    server = WebSocketServer(('0.0.0.0', 9000), websocket_handler)
     print "Starting NullMQ-ZeroMQ bridge on 9000"
     server.serve_forever()
