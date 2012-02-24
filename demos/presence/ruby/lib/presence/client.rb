@@ -3,7 +3,7 @@ require 'json'
 
 module Presence
   class Client
-    def initialize(context, name, threads=Thread)
+    def initialize(context, name, text=nil, threads=Thread)
       @context = context
       @name    = name
       @peers   = {}
@@ -29,6 +29,8 @@ module Presence
           case cmd
           when "list"
             $stdout.puts @peers.inspect
+          when "text"
+            @text = $stdin.gets.chomp
           when "quit"
             break
           end
@@ -55,6 +57,7 @@ module Presence
       @push = spawn_socket("tcp://localhost:10003", ZMQ::PUSH) do |sock|
         sock.send_string(JSON.generate({
           "name" => @name,
+          "text" => @text,
           "online" => true,
           "timeout" => 2
         }))
@@ -87,7 +90,7 @@ module Presence
       rescue JSON::ParserError
         return
       end
-      @peers[client['name']] = client
+      @peers[client['name']].merge!(client)
     end
 
     def request_peers

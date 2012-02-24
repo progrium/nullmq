@@ -63,7 +63,7 @@ module Presence
         when "list"
           sock.send_string(JSON.generate(Hash[*(
             @clients.dup.map do |k, v|
-              [k, {"name" => k, "online" => v['online']}]
+              [k, {"name" => k, "online" => v['online'], "text" => v['text']}]
             end.flatten
           )]))
         else
@@ -119,6 +119,13 @@ module Presence
           "online" => data["online"]
         })
         client["online"] = data["online"]
+      end
+      if client["text"] != data["text"]
+        @changes << JSON.generate({
+          "name" => data["name"],
+          "text" => data["text"]
+        })
+        client["text"] = data["text"]
       end
       client["timeout"] = data["timeout"]
       @clients[data["name"]] = client unless @clients[data["name"]]
