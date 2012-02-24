@@ -1,7 +1,0 @@
-task 'build', 'Build source and tests', ->
-  invoke 'build:src'
-
-task 'build:src', 'Build the src files into js', ->
-  util.log "Compiling src..."
-  exec "coffee -o js/ -c src/", (err, stdout, stderr) -> 
-    handleError(err) if err
