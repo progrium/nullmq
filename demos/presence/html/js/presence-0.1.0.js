@@ -108,7 +108,7 @@ Client.prototype.connect = function() {
     return;
   }
 
-  this.context = new nullmq.Context('ws://localhost:9000');
+  this.context = new nullmq.Context('ws://'+window.location.hostname+':9000');
   this.status = Client.CONNECTING;
 
   this.startSub();

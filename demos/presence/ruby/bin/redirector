@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "socket"
+
+server = TCPServer.new(8888)
+private_ipv4 = Socket.ip_address_list.detect{|intf| intf.ipv4_private?}.ip_address
+puts "starting redirector to #{private_ipv4}:8080"
+loop do
+  client = server.accept
+  headers = "HTTP/1.1 301 Moved\r\nDate: Tue, 14 Dec 2010 10:48:45 GMT\r\nServer: Ruby\r\nLocation: http://#{private_ipv4}:8080/\r\nContent-length: 0\r\n\r\n"
+  client.puts headers
+  client.close
+end
