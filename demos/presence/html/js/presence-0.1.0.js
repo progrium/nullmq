@@ -5,14 +5,27 @@ function MainController($updateView) {
   this.STATUS_DISCONNECTED  = Client.DISCONNECTED;
   this.STATUS_DISCONNECTING = Client.DISCONNECTING;
 
+  this.messages = []
   this.client = new Client();
   this.client.onChange = $updateView;
+  this.client.processMessage = function(message) {
+    this.messages.push(message);
+    $updateView();
+  }.bind(this);
 
   this.connect = function() {
     this.client.connect();
   }.bind(this);
   this.disconnect = function() {
     this.client.disconnect();
+  }.bind(this);
+  this.sendMessage = function() {
+    if (!this.message) {
+      return;
+    }
+
+    this.client.sendMessage(this.message);
+    this.message = '';
   }.bind(this);
 
   scope = this;
@@ -41,6 +54,8 @@ Client.prototype.connect = function() {
   this.startSub();
   this.requestPeers();
   this.startPush();
+  this.startMessageSub();
+  this.startMessagePush();
 
   this.status = Client.CONNECTED;
 };
@@ -55,6 +70,8 @@ Client.prototype.disconnect = function() {
   this.stopSub();
   this.clearPeers();
   this.stopPush();
+  this.stopMessageSub();
+  this.stopMessagePush();
   this.context.term();
 
   this.status = Client.DISCONNECTED;
@@ -96,7 +113,7 @@ Client.prototype.startSub = function() {
   this.sub.connect('/127.0.0.1:10001');
   this.sub.setsockopt(nullmq.SUBSCRIBE, '');
 
-  this.sub.recvall(function (change) {
+  this.sub.recvall(function(change) {
     this.processChange(change);
   }.bind(this));
 }
@@ -137,6 +154,42 @@ Client.prototype.startPush = function() {
 
 Client.prototype.stopPush = function() {
   (this.push.close || angular.noop)();
+}
+
+
+Client.prototype.startMessageSub = function() {
+  this.messageSub = this.context.socket(nullmq.SUB);
+
+  this.messageSub.connect('/127.0.0.1:10005');
+  this.messageSub.setsockopt(nullmq.SUBSCRIBE, '');
+
+  this.messageSub.recvall(function(message) {
+    this.processMessage(JSON.parse(message));
+  }.bind(this));
+}
+
+Client.prototype.stopMessageSub = function() {
+  (this.messageSub.close || angular.noop)();
+}
+
+Client.prototype.startMessagePush = function() {
+  this.messagePush = this.context.socket(nullmq.PUSH);
+  this.messagePush.connect('/127.0.0.1:10004');
+}
+
+Client.prototype.sendMessage = function(message) {
+  if (this.status != Client.CONNECTED) {
+    return;
+  }
+
+  this.messagePush.send(JSON.stringify({
+      name: this.name
+    , text: message
+  }));
+}
+
+Client.prototype.stopMessagePush = function() {
+  (this.messagePush.close || angular.noop)();
 }
 
 Object.merge = function(destination, source) {

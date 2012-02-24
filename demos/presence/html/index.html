@@ -47,6 +47,19 @@
               </div>
             </div>
           </div>
+          <div class="span7">
+            <ul>
+              <li ng:repeat="message in messages">
+                <span>[{{message.timestamp}}]</span>
+                <span><{{message.name}}></span>
+                <span>{{message.text}}</span>
+              </li>
+            </ul>
+            <form ng:submit="sendMessage()" ng:show="client.status == STATUS_CONNECTED">
+              <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
+              <input type="submit" class="btn" value="Send" />
+            </form>
+          </div>
         </div>
       </section>
     </div>
