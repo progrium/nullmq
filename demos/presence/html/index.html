@@ -12,29 +12,32 @@
         <h1>Presence</h1>
         <p class="lead">Use the form below to type your name in and register with presence server</p>
       </header>
+      <hr />
       <section id="main">
         <div class="row">
-          <div class="span4">
+          <div class="span5">
+            <ng:switch on="client.status">
+            <h2 ng:switch-when="2">Connecting...</h2>
+            <h2 ng:switch-when="0">You are connected as {{client.name}}</h2>
+            <h2 ng:switch-when="3">Disconnecting...</h2>
+            <h2 ng:switch-when="1">You are not connected</h2>
+            <h2 ng:switch-default>Client status: {{client.status}}</h2>
+            </ng:switch>
             <form class="well form-inline" ng:submit="connect()">
-              <input type="text" name="client.name" placeholder="Client Name" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
+              <input class="input-small" type="text" name="client.name" placeholder="Client Name" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
+              <input class="input-large" type="text" name="client.text" placeholder="Status Text" ng:disabled="{{client.status == STATUS_CONNECTED}}" />
               <input type="submit" class="btn btn-primary" value="Connect" ng:show="client.status == STATUS_DISCONNECTED" />
               <a class="btn btn-danger" ng:click="disconnect()" ng:show="client.status == STATUS_CONNECTED">Disconnect</a>
             </form>
-          </div>
-          <ng:switch on="client.status">
-          <div class="span8" ng:switch-when="2">
-            <h2>Connecting...</h2>
-          </div>
-          <div class="span8" ng:switch-when="0">
-            <h2>You are connected as {{client.name}}</h2>
             <div class="row" ng:show="client.getPeers().length > 0" ng:repeat="peer in client.getPeers()">
               <div class="span12">
                 <h3>
-                  {{peer.name}}
                   <ng:switch on="peer.online" >
-                    <small class="label label-success" ng:switch-when="true">online</small>
-                    <small class="label label-important" ng:switch-when="false">offline</small>
+                    <span class="label label-success" ng:switch-when="true">online</span>
+                    <span class="label label-important" ng:switch-when="false">offline</span>
                   </ng:switch>
+                  {{peer.name}}
+                  <small>{{peer.text}}</small>
                 </h3>
               </div>
             </div>
@@ -44,16 +47,6 @@
               </div>
             </div>
           </div>
-          <div class="span8" ng:switch-when="3">
-            <h2>Disconnecting...</h2>
-          </div>
-          <div class="span8" ng:switch-when="1">
-            <h2>You are not connected</h2>
-          </div>
-          <div class="span8" ng:switch-default>
-            <h2>Client status: {{client.status}}</h2>
-          </div>
-          </ng:switch>
         </div>
       </section>
     </div>

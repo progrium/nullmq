@@ -111,7 +111,9 @@ Client.prototype.processChange = function(change) {
   } catch (e) {
     return;
   }
-  this.peers[peer['name']] = peer;
+  this.peers[peer['name']] = this.peers[peer['name']] || {};
+
+  Object.merge(this.peers[peer['name']], peer);
   this.onChange();
 }
 
@@ -124,6 +126,7 @@ Client.prototype.startPush = function() {
       this.push.send(JSON.stringify({
           name: this.name
         , online: true
+        , text: this.text
         , timeout: 2
       }));
     } else {
@@ -135,3 +138,12 @@ Client.prototype.startPush = function() {
 Client.prototype.stopPush = function() {
   (this.push.close || angular.noop)();
 }
+
+Object.merge = function(destination, source) {
+    for (var property in source) {
+        if (source.hasOwnProperty(property)) {
+            destination[property] = source[property];
+        }
+    }
+    return destination;
+};
