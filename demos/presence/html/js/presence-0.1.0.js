@@ -13,6 +13,11 @@ function MainController($updateView) {
     }.bind(this))
   }.bind(this);
 
+  this.scrollToBottom = function() {
+    var objDiv = document.getElementById("chat_window");
+    objDiv.scrollTop = objDiv.scrollHeight;
+  }
+
   this.presenceClient = new Client({
       subscribe: "tcp://localhost:10001"
     , request:   "tcp://localhost:10002"
@@ -54,12 +59,14 @@ function MainController($updateView) {
     JSON.parse(payload).forEach(function(msg) {
       this.messages.push(msg);
     }.bind(this));
-    $updateView();
+    this.$root.$eval();
+    this.scrollToBottom();
   }.bind(this);
   this.chatClient.onPublish = function(payload) {
     var msg = JSON.parse(payload);
     this.messages.push(msg);
-    $updateView();
+    this.$root.$eval();
+    this.scrollToBottom();
   }.bind(this);
   this.chatClient.onDisconnect = function() {
     this.messages = []

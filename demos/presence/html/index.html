@@ -16,6 +16,10 @@
     table.table tr td.name {
       font-weight: bold;
     }
+    #chat_window {
+      overflow: auto;
+      max-height: 400px;
+    }
     </style>
   </head>
   <body ng:controller="MainController">
@@ -60,19 +64,23 @@
             </div>
           </div>
           <div class="span7">
-            <table class="table table-striped">
-              <tbody>
-                <tr ng:repeat="message in messages">
-                  <td class="timestamp">[{{message.timestamp|timestamp}}]</td>
-                  <td class="name"><{{message.name}}></td>
-                  <td class="body">{{message.text}}</td>
-                </tr>
-              </tbody>
-            </table>
-            <form class="form-inline" ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
-              <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
-              <input type="submit" class="btn" value="Send" />
-            </form>
+            <div id="chat_window" class="row">
+              <table class="table table-striped">
+                <tbody>
+                  <tr ng:repeat="message in messages">
+                    <td class="timestamp">[{{message.timestamp|timestamp}}]</td>
+                    <td class="name"><{{message.name}}></td>
+                    <td class="body">{{message.text}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="send_message" class="row">
+              <form class="form-inline" ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
+                <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
+                <input type="submit" class="btn" value="Send" />
+              </form>
+            </div>
           </div>
         </div>
       </section>
