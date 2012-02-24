@@ -1,19 +1,26 @@
-# Presense server in Ruby using 0mq
+# Presense and chat server in Ruby using 0mq
 
 ## Installation
 
 * clone this repository
 * `bundle install`
 
-## Start server
+## Start presence server
 
-`ruby bin/server`
+`./bin/presence_server`
 
-## Start client
+## Start chat server
 
-`ruby bin/client <name>`, e.g. `ruby bin/client bulat`
+`./bin/chat_server`
 
-### Using client
+## Start presence client
 
-When client is connected to server, type `list` on command line to see all
-other clients server knows about and their online status
+`./bin/presence_client <name> <text>`, e.g. `./bin/presence_client bulat "I'm online"`
+
+## Start chat client
+
+`./bin/chat_client <name>`, e.g. `./bin/chat_client bulat`
+
+### Using chat client
+
+When client is connected to server, type any message and hit enter to see it displayed to peers
