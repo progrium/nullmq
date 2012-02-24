@@ -2,6 +2,7 @@ git+git://github.com/progrium/stomp4py.git#egg=stomp4py
 git+git://github.com/progrium/WebSocket-for-Python#egg=ws4py
 git+git://github.com/progrium/gservice.git#egg=gservice
 gevent==0.13.3
+gevent_zeromq
 greenlet==0.3.1
 lockfile==0.9.1
 nose==1.1.2

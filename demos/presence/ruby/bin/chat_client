@@ -1,0 +1,63 @@
+#!/usr/bin/env ruby
+
+require "rubygems"
+require "bundler/setup"
+
+require "ffi-rzmq"
+require "clone"
+require "json"
+require "thread"
+
+@name = ARGV[0]
+@incoming = Queue.new
+@outgoing = Queue.new
+
+client = Clone::Client.new(ZMQ::Context.new(1), {
+  :subscribe => "tcp://localhost:10004",
+  :request   => "tcp://localhost:10005",
+  :push      => "tcp://localhost:10006"
+})
+
+client.on_response do |payload|
+  begin
+    messages = JSON.parse(payload)
+    messages.each do |msg|
+      @incoming << msg
+    end
+  rescue JSON::ParseError
+  end
+end
+
+client.on_publish do |payload|
+  begin
+    message = JSON.parse(payload)
+    @incoming << message
+  rescue JSON::ParseError
+  end
+end
+
+client.push do
+  @outgoing.pop
+end
+
+Thread.new do
+  loop do
+    msg = @incoming.pop
+    $stdout << sprintf("[%s] <%s> %s\r\n", msg['timestamp'], msg['name'], msg['text'])
+  end
+end
+
+begin
+  $stdout << "connecting...\r\n"
+  client.connect
+  while msg = $stdin.gets.chomp
+    $stdout << "\r"
+    @outgoing << JSON.generate({
+      "text" => msg,
+      "name" => @name
+    })
+  end
+rescue Interrupt
+  $stdout << "disconnecting...\r\n"
+  client.disconnect
+end
