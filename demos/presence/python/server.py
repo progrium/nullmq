@@ -24,8 +24,7 @@ class NullMQConnection(Subscription):
 StompHandler.subscription_class = NullMQConnection
 
 class ZeroMQBridge(object):
-    def __init__(self, prefix):
-        self.prefix = prefix
+    def __init__(self):
         self.connection_by_uid = {}
         self.connection_by_destination = collections.defaultdict(set)
 
@@ -44,10 +43,9 @@ class ZeroMQBridge(object):
                 self.send(part)
 
     def connect(self, connection):
-        print connection
         connection.socket = context.socket(
             getattr(zmq, connection.socket_type.upper()))
-        connection.socket.connect('%s%s' % (self.prefix, connection.destination))
+        connection.socket.connect('%s' % (connection.destination))
         
         self.connection_by_uid[connection.uid] = connection
         self.connection_by_destination[connection.destination].add(connection)
@@ -87,7 +85,7 @@ class ZeroMQBridge(object):
 
 if __name__ == '__main__':
     def websocket_handler(websocket, environ):
-        StompHandler(websocket, ZeroMQBridge('tcp:/')).serve()
+        StompHandler(websocket, ZeroMQBridge()).serve()
 
     server = WebSocketServer(('127.0.0.1', 9000), websocket_handler)
     print "Starting NullMQ-ZeroMQ bridge on 9000"
