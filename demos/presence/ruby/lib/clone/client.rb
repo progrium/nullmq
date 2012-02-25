@@ -2,11 +2,11 @@ require 'thread'
 
 module Clone
   class Client
-    def initialize(context, options, threads = Thread, push_queue = Queue.new)
+    def initialize(context, options, threads = Thread, push_queue = nil)
       @context = context
       @options = options
       @threads = threads
-      @push_queue = push_queue
+      @push_queue = push_queue || Queue.new
     end
 
     def connect
