@@ -6,10 +6,8 @@ require "bundler/setup"
 require "ffi-rzmq"
 require "clone"
 require "json"
-require "thread"
 
 @clients = {}
-@updates = Queue.new
 
 server = Clone::Server.new(ZMQ::Context.new(1), {
   :publish => "tcp://*:10001",
@@ -29,29 +27,23 @@ server.on_push do |payload|
     client = @clients[data["name"]] || {}
     client["last_seen"] = Time.now
     if client["online"] != data["online"]
-      @updates << JSON.generate({
+      server.publish(JSON.generate({
         "name" => data["name"],
         "online" => data["online"]
-      })
+      }))
       client["online"] = data["online"]
     end
     if client["text"] != data["text"]
-      @updates << JSON.generate({
+      server.publish(JSON.generate({
         "name" => data["name"],
         "text" => data["text"]
-      })
+      }))
       client["text"] = data["text"]
     end
     client["timeout"] = data["timeout"]
     @clients[data["name"]] = client unless @clients[data["name"]]
   rescue JSON::ParserError
   end
-end
-
-server.publish do
-  update = @updates.pop
-  $stdout << update+"\r\n"
-  update
 end
 
 begin
@@ -62,10 +54,10 @@ begin
     @clients.dup.each do |name, client|
       if client['online'] && ((Time.now - client['last_seen']) > client['timeout'])
         @clients[name]['online'] = false
-        @updates << JSON.generate({
+        server.publish(JSON.generate({
           "name" => name,
           "online" => false
-        })
+        }))
       end
     end
   end
