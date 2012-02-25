@@ -2,11 +2,11 @@ require 'thread'
 
 module Clone
   class Server
-    def initialize(context, options, threads=Thread)
+    def initialize(context, options, threads=Thread, pub_queue = Queue.new)
       @context = context
       @options = options
       @threads = threads
-      @pub_queue = Queue.new
+      @pub_queue = pub_queue
     end
 
     def start
