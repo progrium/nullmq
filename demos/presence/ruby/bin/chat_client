@@ -6,10 +6,8 @@ require "bundler/setup"
 require "ffi-rzmq"
 require "clone"
 require "json"
-require "thread"
 
 @name = ARGV[0]
-@incoming = Queue.new
 
 client = Clone::Client.new(ZMQ::Context.new(1), {
   :subscribe => "tcp://localhost:10004",
@@ -21,7 +19,7 @@ client.on_response do |payload|
   begin
     messages = JSON.parse(payload)
     messages.each do |msg|
-      @incoming << msg
+      $stdout << sprintf("[%s] <%s> %s\r\n", msg['timestamp'], msg['name'], msg['text'])
     end
   rescue JSON::ParseError
   end
@@ -29,16 +27,9 @@ end
 
 client.on_publish do |payload|
   begin
-    message = JSON.parse(payload)
-    @incoming << message
-  rescue JSON::ParseError
-  end
-end
-
-Thread.new do
-  loop do
-    msg = @incoming.pop
+    msg = JSON.parse(payload)
     $stdout << sprintf("[%s] <%s> %s\r\n", msg['timestamp'], msg['name'], msg['text'])
+  rescue JSON::ParseError
   end
 end
 

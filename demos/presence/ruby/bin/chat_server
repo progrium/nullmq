@@ -6,10 +6,8 @@ require "bundler/setup"
 require "ffi-rzmq"
 require "clone"
 require "json"
-require "thread"
 
 @messages = []
-@updates = Queue.new
 
 server = Clone::Server.new(ZMQ::Context.new(1), {
   :publish => "tcp://*:10004",
