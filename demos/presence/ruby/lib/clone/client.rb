@@ -6,6 +6,7 @@ module Clone
       @context = context
       @options = options
       @threads = threads
+      @push_queue = Queue.new
     end
 
     def connect
@@ -29,8 +30,8 @@ module Clone
       @subscribe_handler = block
     end
 
-    def push(&block)
-      @push_handler = block
+    def push(msg)
+      @push_queue << msg
     end
 
     private
@@ -62,8 +63,7 @@ module Clone
 
     def start_push
       @push = spawn_socket(@options[:push], ZMQ::PUSH) do |sock|
-        data = @push_handler.call
-        sock.send_string(data)
+        sock.send_string(@push_queue.pop)
       end
     end
     

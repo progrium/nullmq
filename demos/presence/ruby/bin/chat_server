@@ -26,15 +26,9 @@ server.on_push do |payload|
     message = JSON.parse(payload)
     message['timestamp'] = Time.now
     @messages << message
-    @updates << JSON.generate(message)
+    server.publish(JSON.generate(message))
   rescue JSON::ParserError
   end
-end
-
-server.publish do
-  update = @updates.pop
-  $stdout << update+"\r\n"
-  update
 end
 
 begin

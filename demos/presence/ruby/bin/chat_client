@@ -10,7 +10,6 @@ require "thread"
 
 @name = ARGV[0]
 @incoming = Queue.new
-@outgoing = Queue.new
 
 client = Clone::Client.new(ZMQ::Context.new(1), {
   :subscribe => "tcp://localhost:10004",
@@ -36,10 +35,6 @@ client.on_publish do |payload|
   end
 end
 
-client.push do
-  @outgoing.pop
-end
-
 Thread.new do
   loop do
     msg = @incoming.pop
@@ -52,10 +47,10 @@ begin
   client.connect
   while msg = $stdin.gets.chomp
     $stdout << "\r"
-    @outgoing << JSON.generate({
+    client.push(JSON.generate({
       "text" => msg,
       "name" => @name
-    })
+    }))
   end
 rescue Interrupt
   $stdout << "disconnecting...\r\n"

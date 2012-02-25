@@ -38,20 +38,16 @@ client.on_publish do |payload|
   end
 end
 
-client.push do
-  @heartbeats.pop
-end
-
 begin
   $stdout << "connecting...\r\n"
   client.connect
   loop do
-    @heartbeats << JSON.generate({
+    client.push(JSON.generate({
       "name" => @name,
       "text" => @text,
       "online" => true,
       "timeout" => 2
-    })
+    }))
     sleep(1)
   end
 rescue Interrupt

@@ -6,6 +6,7 @@ module Clone
       @context = context
       @options = options
       @threads = threads
+      @pub_queue = Queue.new
     end
 
     def start
@@ -30,8 +31,8 @@ module Clone
       @pull_handler = block
     end
 
-    def publish(&block)
-      @pub_handler = block
+    def publish(msg)
+      @pub_queue << msg
     end
 
     private
@@ -50,8 +51,7 @@ module Clone
 
     def start_pub
       @pub = spawn_socket(@options[:publish], ZMQ::PUB) do |sock|
-        pub = @pub_handler.call
-        sock.send_string(pub)
+        sock.send_string(@pub_queue.pop)
       end
     end
 
