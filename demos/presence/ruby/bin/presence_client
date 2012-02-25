@@ -6,12 +6,10 @@ require "bundler/setup"
 require "ffi-rzmq"
 require "clone"
 require "json"
-require "thread"
 
 @peers = {}
 @name = ARGV[0]
 @text = ARGV[1]
-@heartbeats = Queue.new
 
 client = Clone::Client.new(ZMQ::Context.new(1), {
   :subscribe => "tcp://localhost:10001",
@@ -38,28 +36,19 @@ client.on_publish do |payload|
   end
 end
 
-client.push do
-  @heartbeats.pop
-end
-
 begin
   $stdout << "connecting...\r\n"
   client.connect
   loop do
-    @heartbeats << JSON.generate({
+    client.push(JSON.generate({
       "name" => @name,
       "text" => @text,
       "online" => true,
       "timeout" => 2
-    })
+    }))
     sleep(1)
   end
 rescue Interrupt
   $stdout << "disconnecting...\r\n"
-  @heartbeats << JSON.generate({
-    "name" => @name,
-    "text" => @text,
-    "online" => false
-  })
   client.disconnect
 end

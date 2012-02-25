@@ -6,10 +6,8 @@ require "bundler/setup"
 require "ffi-rzmq"
 require "clone"
 require "json"
-require "thread"
 
 @messages = []
-@updates = Queue.new
 
 server = Clone::Server.new(ZMQ::Context.new(1), {
   :publish => "tcp://*:10004",
@@ -26,15 +24,9 @@ server.on_push do |payload|
     message = JSON.parse(payload)
     message['timestamp'] = Time.now
     @messages << message
-    @updates << JSON.generate(message)
+    server.publish(JSON.generate(message))
   rescue JSON::ParserError
   end
-end
-
-server.publish do
-  update = @updates.pop
-  $stdout << update+"\r\n"
-  update
 end
 
 begin
