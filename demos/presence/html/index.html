@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Presence</title>
+    <link href="css/bootstrap-2.0.1.css" rel="stylesheet">
+    <link href="css/bootstrap-responsive-2.0.1.css" rel="stylesheet">
+    <style>
+    table.table tr td.timestamp {
+      width: 10%;
+    }
+    table.table tr td.name {
+      width: 20%;
+    }
+    table.table tr td.text {
+      width: 80%;
+    }
+    table.table tr td.name {
+      font-weight: bold;
+    }
+    #chat_window {
+      overflow: auto;
+      max-height: 400px;
+    }
+    </style>
+  </head>
+  <body ng:controller="MainController">
+    <div class="container">
+      <header id="head">
+        <h1>Presence</h1>
+        <p class="lead">Use the form below to type your name in and register with presence server</p>
+      </header>
+      <hr />
+      <section id="main">
+        <div class="row">
+          <div class="span5">
+            <ng:switch on="presenceClient.status">
+            <h2 ng:switch-when="2">Connecting...</h2>
+            <h2 ng:switch-when="0">You are connected as {{name}}</h2>
+            <h2 ng:switch-when="3">Disconnecting...</h2>
+            <h2 ng:switch-when="1">You are not connected</h2>
+            <h2 ng:switch-default>Client status: {{presenceClient.status}}</h2>
+            </ng:switch>
+            <form class="well form-inline" ng:submit="connect()">
+              <input class="input-small" type="text" name="name" placeholder="Client Name" ng:disabled="{{presenceClient.status == STATUS_CONNECTED}}" />
+              <input class="input-large" type="text" name="text" placeholder="Status Text" ng:disabled="{{presenceClient.status == STATUS_CONNECTED}}" />
+              <input type="submit" class="btn btn-primary" value="Connect" ng:show="presenceClient.status == STATUS_DISCONNECTED" />
+              <a class="btn btn-danger" ng:click="disconnect()" ng:show="presenceClient.status == STATUS_CONNECTED">Disconnect</a>
+            </form>
+            <div class="row" ng:show="getPeers().length > 0" ng:repeat="peer in getPeers()">
+              <div class="span12">
+                <h3>
+                  <ng:switch on="peer.online" >
+                    <span class="label label-success" ng:switch-when="true">online</span>
+                    <span class="label label-important" ng:switch-when="false">offline</span>
+                  </ng:switch>
+                  {{peer.name}}
+                  <small>{{peer.text}}</small>
+                </h3>
+              </div>
+            </div>
+            <div class="row" ng:hide="getPeers().length > 0">
+              <div class="span12">
+                <h3>No peers online</h3>
+              </div>
+            </div>
+          </div>
+          <div class="span7">
+            <div id="chat_window" class="row">
+              <table class="table table-striped">
+                <tbody>
+                  <tr ng:repeat="message in messages">
+                    <td class="timestamp">[{{message.timestamp|timestamp}}]</td>
+                    <td class="name"><{{message.name}}></td>
+                    <td class="body">{{message.text}}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div id="send_message" class="row">
+              <form class="form-inline" ng:submit="sendMessage()" ng:show="presenceClient.status == STATUS_CONNECTED">
+                <input class="input-xxlarge" type="text" name="message" placeholder="Say something" />
+                <input type="submit" class="btn" value="Send" />
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <script type="text/javascript" src="js/angular-0.9.19.js" ng:autobind></script>
+    <script type="text/javascript" src="js/stomp-0.1.0.js"></script>
+    <script type="text/javascript" src="js/nullmq-0.1.0.js"></script>
+    <script type="text/javascript" src="js/presence-0.1.0.js"></script>
+    <script type="text/javascript">
+      angular.filter('timestamp', function(input) {
+        var timestamp = new Date(input);
+        return timestamp.getHours()+':'+timestamp.getMinutes()+':'+timestamp.getSeconds();
+      });
+    </script>
+  </body>
+</html>
