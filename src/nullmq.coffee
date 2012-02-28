@@ -139,7 +139,7 @@ class Socket
     @linger = -1
     @filters = []
     @connections = {}
-    @rr_index = 0
+    @rr_index = 0 # round-robin counter
     @last_recv = undefined
     @context.sockets.push this
     if @type in nullmq._SENDERS

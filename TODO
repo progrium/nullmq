@@ -1,7 +1,6 @@
--Bridge integration tests
--Reconnect
--Subscribe Filters
 -Multipart
 -DEALER, ROUTER
+-Bridge integration tests
+-Reconnect
+-Subscribe Filters (filter on sending socket)
 -high watermark
--
